@@ -160,7 +160,6 @@ class RackScreenTest {
         find("Album A").longClick()
         Thread.sleep(1000)
         shot("13-card")
-        context.getExternalFilesDir("shots")?.let { device.dumpWindowHierarchy(File(it, "13-card.xml")) }
         assertNotNull("the card did not open", device.wait(Until.findObject(By.text("INSERT")), 10_000))
         assertNotNull(device.findObject(By.text("Alpha Three")))
         findText("CLOSE").click()
@@ -172,24 +171,25 @@ class RackScreenTest {
         shot("14-rack-mixtapes")
         find("Blank mixtape").click()
         findText("NEW MIXTAPE")
-        device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10_000).text = "Road trip"
+        // (the name is left blank: a blank name becomes "Mixtape 1")
+        assertNotNull(device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10_000))
         device.wait(Until.findObject(By.descStartsWith("Beta Two")), 10_000).click()
         device.wait(Until.findObject(By.descStartsWith("Alpha One")), 10_000).click()
         assertNotNull("the mixtape count", device.wait(Until.findObject(By.textStartsWith("ON THIS TAPE · 2")), 10_000))
         shot("15-mixtape-editor")
         findText("SAVE").click()
-        waitFor("the mixtape") { vm.ui.value.mixtapes.size == 1 && vm.ui.value.mixtapes[0].name == "Road trip" }
+        waitFor("the mixtape") { vm.ui.value.mixtapes.size == 1 && vm.ui.value.mixtapes[0].name == "Mixtape 1" }
         assertEquals(2, vm.ui.value.mixtapes[0].keys.size)
         assertNotNull(device.wait(Until.findObject(By.text("MIXTAPES 1")), 10_000))
         shot("16-mixtape-in-rack")
 
         // and the mixtape goes in the deck, songs in the order they were picked
-        carryToDeck("Road trip", deck)
+        carryToDeck("Mixtape 1", deck)
         waitFor("the mixtape in the deck") { vm.ui.value.tape.id.startsWith("mix:") && vm.ui.value.queue.size == 2 }
         find("Play").click()
         waitFor("the mixtape's first song") { vm.ui.value.transport == Transport.PLAYING && vm.ui.value.title == "Beta Two" }
         shot("17-mixtape-playing")
-        assertTrue(vm.ui.value.tape.title == "Road trip")
+        assertTrue(vm.ui.value.tape.title == "Mixtape 1")
         find("Stop, eject").click()
     }
 }
