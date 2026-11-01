@@ -3,6 +3,7 @@ package dev.foldman.ui
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -93,6 +95,9 @@ fun FoldmanScreen(
     val scope = rememberCoroutineScope()
     var shelfOpen by rememberSaveable { mutableStateOf(false) }
     var tapeSheetOpen by rememberSaveable { mutableStateOf(false) }
+    // where the cassette window is, and whether a tape from the rack is being held over it
+    var deckBounds by remember { mutableStateOf(Rect.Zero) }
+    var dropHover by remember { mutableStateOf(false) }
     val feel by rememberUpdatedState(ui)
 
     // A new tape drops into the deck whenever the source changes (and when the app opens).
@@ -106,6 +111,13 @@ fun FoldmanScreen(
             if (feel.keySounds) sounds.autoStop()
             when (e) {
                 DeckEvent.TapeEnd -> if (feel.haptics) view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                DeckEvent.TapeInserted -> {
+                    if (feel.haptics) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                    scope.launch {
+                        anim.insert.snapTo(1f)
+                        anim.insert.animateTo(0f, spring(dampingRatio = 0.5f, stiffness = 260f))
+                    }
+                }
                 DeckEvent.Eject -> {
                     if (feel.haptics) view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                     scope.launch {
@@ -179,7 +191,10 @@ fun FoldmanScreen(
             LaunchedEffect(posture) { view.showSystemBars(posture != Posture.Cover) }
             when (posture) {
                 // The cover screen is the player itself: edge to edge, system bars hidden.
-                Posture.Cover -> WalkmanPlayer(ui, anim, walkman, Modifier.fillMaxSize())
+                Posture.Cover -> WalkmanPlayer(
+                    ui, anim, walkman, Modifier.fillMaxSize(),
+                    onWindowBounds = { deckBounds = it }, dropHover = dropHover,
+                )
                 Posture.Unfolded -> Column(
                     Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -215,14 +230,17 @@ fun FoldmanScreen(
                 }
             }
             if (shelfOpen && posture == Posture.Cover) {
-                ModalBottomSheet(
-                    onDismissRequest = { shelfOpen = false },
-                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                    containerColor = Color(0xFF1C1510),
-                ) {
-                    TapeShelf(
-                        ui,
-                        ShelfActions(
+                BackHandler { shelfOpen = false }
+                CassetteRack(
+                    ui = ui,
+                    actions = RackActions(
+                        insert = vm::insertTape,
+                        createMixtape = { name, keys -> vm.createMixtape(name, keys) },
+                        saveMixtape = vm::saveMixtape,
+                        deleteMixtape = vm::deleteMixtape,
+                        addToMixtape = vm::addToMixtape,
+                        pickFolder = onPickFolder,
+                        shelf = ShelfActions(
                             selectSource = { vm.selectSource(it) },
                             pickFolder = onPickFolder,
                             playTrack = { vm.playTrack(it); shelfOpen = false },
@@ -231,9 +249,11 @@ fun FoldmanScreen(
                             installApp = onInstallApp,
                             apple = appleActions,
                         ),
-                        Modifier.fillMaxWidth().height(sheetHeight),
-                    )
-                }
+                    ),
+                    deckBounds = deckBounds,
+                    onHover = { dropHover = it },
+                    onClose = { shelfOpen = false },
+                )
             }
             if (tapeSheetOpen) {
                 ModalBottomSheet(

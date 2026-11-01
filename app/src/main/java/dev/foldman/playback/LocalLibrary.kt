@@ -70,10 +70,12 @@ class LocalLibrary(private val context: Context) {
         val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
         val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
             ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+        val length = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
         track.copy(
             title = title?.takeIf { it.isNotBlank() } ?: track.title,
             artist = artist?.takeIf { it.isNotBlank() } ?: track.artist,
             tagged = true,
+            durationMs = length.coerceAtLeast(0L),
         )
         // A file that can't be read is marked done too, so it isn't tried again until it changes.
     }.getOrDefault(track.copy(tagged = true))

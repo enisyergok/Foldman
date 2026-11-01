@@ -55,18 +55,21 @@ data class AppleUi(
 
 data class LocalTrack(
     val uri: Uri,
-    val title: String,
-    val artist: String?,
+    override val title: String,
+    override val artist: String?,
     /** The album folder's name, as shown. */
-    val folder: String,
+    override val folder: String,
     val coverUri: Uri?,
     /** Where that folder is under the music folder, so two albums with the same name stay apart. */
-    val folderPath: String = folder,
+    override val folderPath: String = folder,
     val size: Long = 0,
     val modified: Long = 0,
     /** The title and artist come from the file's tags (or it has none), not just from its name. */
     val tagged: Boolean = false,
-)
+    override val durationMs: Long = 0,
+) : TapeSong {
+    override val key: String get() = uri.toString()
+}
 
 /** A song in the play queue: a local file (id = index) or another app's queue item. */
 data class QueueEntry(

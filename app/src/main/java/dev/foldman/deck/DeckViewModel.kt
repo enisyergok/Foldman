@@ -81,6 +81,9 @@ data class DeckUi(
     /** The MONITOR switch: keeps the screen lit while the tape runs. */
     val monitor: Boolean = true,
     val apple: AppleUi = AppleUi(),
+    /** The tape that is in the deck (what the play queue is made of). */
+    val tape: TapeInfo = TapeInfo(),
+    val mixtapes: List<Mixtape> = emptyList(),
 ) {
     /** How far through the tape we are: the left reel empties into the right one as this grows. */
     val progress: Float get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
@@ -91,6 +94,8 @@ sealed interface DeckEvent {
     data object TapeEnd : DeckEvent
     /** STOP pressed while already stopped: the cassette door pops. */
     data object Eject : DeckEvent
+    /** A tape was put in the deck: it drops into place. */
+    data object TapeInserted : DeckEvent
 }
 
 class DeckViewModel(app: Application) : AndroidViewModel(app) {
@@ -121,7 +126,13 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             else -> remotes.getValue(source)
         }
 
+    /** Everything found in the music folder; the rack is made from this. */
+    private var libraryTracks: List<LocalTrack> = emptyList()
+    /** The songs on the tape that is in the deck: the play queue. */
     private var tracks: List<LocalTrack> = emptyList()
+    private var currentTape = TapeInfo()
+    private val mixtapeStore = MixtapeStore(app)
+    private val mixtapes = MutableStateFlow(mixtapeStore.load())
     private var folderName: String? = null
     private var scanJob: Job? = null
 
@@ -174,7 +185,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     @androidx.annotation.VisibleForTesting
     fun loadTracksForTest(list: List<LocalTrack>) {
         selectSource(Source.LOCAL)
-        useTracks(list, Uri.EMPTY, reset = true)
+        useLibrary(list, Uri.EMPTY, reset = true)
     }
 
     /** The app came to the front or went away; the loop only runs while it is in front. */
@@ -336,12 +347,15 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         loadFolder(uri, firstLoad = false)
     }
 
+    /** Plays the song at [index] of the whole library (the whole library goes in as the tape). */
     fun playTrack(index: Int) {
         selectSource(Source.LOCAL)
         if (winding != 0) finishWinding()
+        val song = libraryTracks.getOrNull(index) ?: return
+        if (currentTape.kind != TapeKind.LIBRARY) applyTape(Tapes.library(libraryTracks), startIndex = null)
         stopped = false
         playRequestedAt = SystemClock.elapsedRealtime()
-        local.playTrack(index)
+        local.playTrack(tracks.indexOfFirst { it.uri == song.uri }.coerceAtLeast(0))
     }
 
     private fun loadFolder(uri: Uri, firstLoad: Boolean) {
@@ -350,7 +364,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             // What was found last time shows at once; the folder is then checked for changes.
             val cached = withContext(Dispatchers.IO) { libraryCache.load(uri) }.orEmpty()
             if (cached.isNotEmpty()) {
-                useTracks(cached, uri, reset = !firstLoad)
+                useLibrary(cached, uri, reset = !firstLoad)
             } else {
                 local.setLibraryStatus(SourceStatus.Scanning(0))
             }
@@ -364,21 +378,96 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             // Only touch the player when the list really changed (a changed file, a new album…).
-            if (found.map { it.uri } != tracks.map { it.uri }) useTracks(found, uri, reset = cached.isEmpty() && !firstLoad)
+            if (found.map { it.uri } != libraryTracks.map { it.uri }) useLibrary(found, uri, reset = cached.isEmpty() && !firstLoad)
             val tagged = library.readTags(found)
-            useTracks(tagged, uri, reset = false)
+            useLibrary(tagged, uri, reset = false)
             withContext(Dispatchers.IO) { libraryCache.save(uri, tagged) }
         }
     }
 
-    /** Makes [list] the tape: remembers it, loads it into the player and refreshes the screen. */
-    private fun useTracks(list: List<LocalTrack>, tree: Uri, reset: Boolean) {
+    /**
+     * Makes [list] the music on the phone: the rack is made from it. The tape that was in the deck stays
+     * in (or, for a new folder, the whole library goes in).
+     */
+    private fun useLibrary(list: List<LocalTrack>, tree: Uri, reset: Boolean) {
         folderName = list.firstOrNull()?.folderPath?.substringBefore('/') ?: tree.lastPathSegment?.substringAfterLast(':')
-        tracks = list
-        local.setTracks(list, startIndex = if (reset) 0 else null)
+        libraryTracks = list
+        val wanted = if (reset) Tapes.library(list)
+        else Tapes.find(prefs.getString(KEY_TAPE, null), list, mixtapes.value) ?: Tapes.library(list)
+        applyTape(wanted, startIndex = if (reset) 0 else null)
         if (reset) stopped = true
         tick()
     }
+
+    /** Loads [tape] into the player as the queue. */
+    private fun applyTape(tape: Tape<LocalTrack>, startIndex: Int?) {
+        currentTape = TapeInfo(tape.id, tape.kind, tape.title)
+        tracks = tape.songs
+        local.setTracks(tape.songs, startIndex)
+        prefs.edit { putString(KEY_TAPE, tape.id) }
+    }
+
+    /**
+     * Puts [tape] in the deck, stopped at its start: PLAY plays it. What was playing is stopped, as
+     * taking a cassette out would.
+     */
+    fun insertTape(tape: Tape<LocalTrack>) {
+        if (tape.songs.isEmpty()) return
+        selectSource(Source.LOCAL)
+        if (winding != 0) finishWinding()
+        local.pause()
+        applyTape(tape, startIndex = 0)
+        stopped = true
+        playRequestedAt = 0
+        _events.tryEmit(DeckEvent.TapeInserted)
+        tick()
+    }
+
+    /** Brings the tape in the deck up to date after the library or its mixtape changed. */
+    private fun reapplyCurrentTape() {
+        val tape = Tapes.find(currentTape.id, libraryTracks, mixtapes.value) ?: Tapes.library(libraryTracks)
+        applyTape(tape, startIndex = null)
+        tick()
+    }
+
+    // region Mixtapes
+
+    /** Makes a new mixtape of the songs [keys] (their file addresses) and returns its id. */
+    fun createMixtape(name: String, keys: List<String>): String {
+        val id = java.util.UUID.randomUUID().toString()
+        val label = name.trim().ifBlank { "Mixtape ${mixtapes.value.size + 1}" }
+        mixtapes.value = mixtapes.value + Mixtape(id, label, keys.distinct())
+        persistMixtapes()
+        return id
+    }
+
+    fun saveMixtape(id: String, name: String, keys: List<String>) {
+        val label = name.trim().ifBlank { "Mixtape" }
+        mixtapes.value = mixtapes.value.map { if (it.id == id) Mixtape(id, label, keys.distinct()) else it }
+        persistMixtapes()
+        if (currentTape.id == Tapes.mixtapeId(id)) reapplyCurrentTape()
+    }
+
+    fun deleteMixtape(id: String) {
+        mixtapes.value = mixtapes.value.filterNot { it.id == id }
+        persistMixtapes()
+        if (currentTape.id == Tapes.mixtapeId(id)) reapplyCurrentTape()
+    }
+
+    /** Adds the song [key] to the end of a mixtape (it is not added twice). */
+    fun addToMixtape(id: String, key: String) {
+        mixtapes.value = mixtapes.value.map { if (it.id == id && key !in it.keys) it.copy(keys = it.keys + key) else it }
+        persistMixtapes()
+        if (currentTape.id == Tapes.mixtapeId(id)) reapplyCurrentTape()
+    }
+
+    private fun persistMixtapes() {
+        val snapshot = mixtapes.value
+        viewModelScope.launch(Dispatchers.IO) { mixtapeStore.save(snapshot) }
+        tick()
+    }
+
+    // endregion
 
     fun refresh() {
         backend.refresh()
@@ -409,8 +498,13 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun playQueueItem(id: Long) {
-        if (source == Source.LOCAL) return playTrack(id.toInt())
         if (winding != 0) finishWinding()
+        if (source == Source.LOCAL) {
+            stopped = false
+            playRequestedAt = SystemClock.elapsedRealtime()
+            local.playTrack(id.toInt())
+            return
+        }
         stopped = false
         playRequestedAt = SystemClock.elapsedRealtime()
         backend.playQueueItem(id)
@@ -680,7 +774,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             trackCount = state.trackCount,
             hasNext = state.hasNext,
             hasPrevious = state.hasPrevious,
-            tracks = tracks,
+            tracks = libraryTracks,
             folderName = folderName,
             // While the wheel is being turned our own value leads; otherwise follow the hardware keys.
             volume = if (kotlin.math.abs(prev.volume - volume) * max < 1f) prev.volume else volume,
@@ -703,6 +797,8 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             sleepRemainingMs = if (sleepDeadline > 0) (sleepDeadline - now).coerceAtLeast(0) else 0L,
             monitor = prefs.getBoolean(KEY_MONITOR, true),
             apple = apple.value,
+            tape = currentTape,
+            mixtapes = mixtapes.value,
         )
     }
 
@@ -745,6 +841,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val KEY_SOURCE = "source"
         private const val KEY_FOLDER = "folder"
+        private const val KEY_TAPE = "tape_id"
         private const val KEY_SOUNDS = "key_sounds"
         private const val KEY_HAPTICS = "haptics"
         private const val KEY_MONITOR = "monitor"

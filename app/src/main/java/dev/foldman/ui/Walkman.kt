@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -47,6 +48,8 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.imageResource
@@ -128,6 +131,7 @@ private const val KNOB_ART_ANGLE = 28f
 /** The cassette window's frame: where its picture is cut from, its top edge, height, and how much bigger it may be drawn. */
 private val WINDOW_CROP = Offset(108f, 342f)
 private val WINDOW_PIVOT = Offset(385f, 344f)
+private val WINDOW_CENTER = Offset(385f, 725f)
 private const val WINDOW_H = 763f
 private const val WINDOW_GROWTH = 0.10f
 
@@ -176,7 +180,16 @@ private class Art(
  * design and every control on it does its job.
  */
 @Composable
-fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier: Modifier = Modifier) {
+fun WalkmanPlayer(
+    ui: DeckUi,
+    anim: DeckAnimations,
+    a: WalkmanActions,
+    modifier: Modifier = Modifier,
+    /** Told where the cassette window is on screen, so the rack knows where a dragged tape can be dropped. */
+    onWindowBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+    /** A tape is being held over the window. */
+    dropHover: Boolean = false,
+) {
     val bg = ImageBitmap.imageResource(R.drawable.wm_bg)
     val window = ImageBitmap.imageResource(R.drawable.wm_window)
     val keyUp = KEY_ART.associate { it.id to ImageBitmap.imageResource(keyRes(it.id, down = false)) }
@@ -265,11 +278,16 @@ fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier:
                     if (ui.monitor) drawMonitorSpark()
                     // the cassette, the dials and switches: below the extra rows above the brand name
                     translate(0f, dyTop) {
-                        scale(ws, ws, WINDOW_PIVOT) {
-                            img(art.window, WINDOW_CROP.x, WINDOW_CROP.y)
-                            drawTitle(titleLayout)
-                            if (ui.side == 1) img(art.sideB, 200f, 422f)
-                            drawReels(anim, ui.side == 1, art)
+                        // A tape dropping in (or the door popping) makes the whole window give a little.
+                        val bump = 1f + 0.06f * anim.insert.value - 0.03f * anim.pop.value
+                        scale(bump, bump, WINDOW_CENTER) {
+                            scale(ws, ws, WINDOW_PIVOT) {
+                                img(art.window, WINDOW_CROP.x, WINDOW_CROP.y)
+                                drawTitle(titleLayout)
+                                if (ui.side == 1) img(art.sideB, 200f, 422f)
+                                drawReels(anim, ui.side == 1, art)
+                                if (dropHover) drawDropGlow()
+                            }
                         }
                         drawTapeLamps(ui.tapeType, pressed["tape"] == true)
                         drawSlide(art.slide, nr)
@@ -319,6 +337,7 @@ fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier:
                 Modifier.at(
                     WINDOW_PIVOT.x - (WINDOW_PIVOT.x - 110f) * ws, WINDOW_PIVOT.y + dyTop, 550f * ws, WINDOW_H * ws, s,
                 )
+                    .onGloballyPositioned { onWindowBounds(it.boundsInRoot()) }
                     .semantics {
                         role = Role.Button
                         contentDescription = "Cassette: $titleText"
@@ -655,6 +674,13 @@ private fun DrawScope.drawKeys(t: Transport, pressed: Map<String, Boolean>, art:
 private fun DrawScope.drawKnob(knob: ImageBitmap, angle: Float) {
     val r = knob.width / 2f
     rotate(angle - KNOB_ART_ANGLE, KNOB_CENTER) { img(knob, KNOB_CENTER.x - r, KNOB_CENTER.y - r) }
+}
+
+/** The orange glow round the cassette window while a tape is held over it. */
+private fun DrawScope.drawDropGlow() {
+    val corner = CornerRadius(26f)
+    drawRoundRect(ORANGE.copy(alpha = 0.30f), Offset(98f, 332f), Size(574f, 787f), corner, style = Stroke(26f))
+    drawRoundRect(ORANGE.copy(alpha = 0.95f), Offset(106f, 340f), Size(558f, 771f), corner, style = Stroke(6f))
 }
 
 private fun DrawScope.drawTapeLamps(type: Int, buttonDown: Boolean) {

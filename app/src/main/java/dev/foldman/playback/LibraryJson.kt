@@ -14,11 +14,13 @@ data class CachedTrack(
     val size: Long,
     val modified: Long,
     val tagged: Boolean,
+    val durationMs: Long = 0,
 )
 
 /** The cache file's format. */
 object LibraryJson {
-    const val VERSION = 1
+    /** 2: songs carry their length. */
+    const val VERSION = 2
 
     fun encode(tracks: List<CachedTrack>): String {
         val array = JSONArray()
@@ -27,7 +29,7 @@ object LibraryJson {
                 JSONObject()
                     .put("u", t.uri).put("t", t.title).put("a", t.artist ?: JSONObject.NULL)
                     .put("f", t.folder).put("p", t.folderPath).put("c", t.cover ?: JSONObject.NULL)
-                    .put("s", t.size).put("m", t.modified).put("g", t.tagged),
+                    .put("s", t.size).put("m", t.modified).put("g", t.tagged).put("d", t.durationMs),
             )
         }
         return JSONObject().put("version", VERSION).put("tracks", array).toString()
@@ -50,6 +52,7 @@ object LibraryJson {
                 size = o.getLong("s"),
                 modified = o.getLong("m"),
                 tagged = o.getBoolean("g"),
+                durationMs = o.optLong("d", 0L),
             )
         }
     }.getOrNull()

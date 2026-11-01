@@ -24,7 +24,7 @@ class LibraryCache(private val context: Context) {
             LocalTrack(
                 uri = Uri.parse(it.uri), title = it.title, artist = it.artist, folder = it.folder,
                 coverUri = it.cover?.let(Uri::parse), folderPath = it.folderPath, size = it.size,
-                modified = it.modified, tagged = it.tagged,
+                modified = it.modified, tagged = it.tagged, durationMs = it.durationMs,
             )
         }
     }
@@ -36,7 +36,7 @@ class LibraryCache(private val context: Context) {
                 tracks.map {
                     CachedTrack(
                         it.uri.toString(), it.title, it.artist, it.folder, it.folderPath,
-                        it.coverUri?.toString(), it.size, it.modified, it.tagged,
+                        it.coverUri?.toString(), it.size, it.modified, it.tagged, it.durationMs,
                     )
                 },
             )
