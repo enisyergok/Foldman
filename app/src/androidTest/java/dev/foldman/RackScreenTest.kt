@@ -86,7 +86,20 @@ class RackScreenTest {
         dismissSystemBox().let { device }.wait(Until.findObject(By.descStartsWith(selectorDesc)), 10_000) ?: throw AssertionError("nothing described \"$selectorDesc\" on screen")
 
     private fun findText(text: String): UiObject2 =
-        device.wait(Until.findObject(By.text(text)), 10_000) ?: throw AssertionError("no text \"$text\" on screen")
+        device.wait(Until.findObject(By.text(text)), 10_000) ?: run {
+            shot("fail-no-${text.take(12).replace(' ', '-')}")
+            throw AssertionError("no text \"$text\" on screen")
+        }
+
+    /** Taps the cassette until the rack is up (a tap during a closing moment can be missed on a slow emulator). */
+    private fun openRack() {
+        repeat(3) {
+            find("Cassette").click()
+            if (device.wait(Until.findObject(By.text("CASSETTE RACK")), 4_000) != null) return
+            Thread.sleep(500)
+        }
+        findText("CASSETTE RACK")
+    }
 
     private fun song(title: String, album: String, artist: String, freq: Double): LocalTrack {
         val file = TestAudio.wav(File(context.cacheDir, "rack/$album/$title.wav"), 60.0, rate = 8000, channels = 1, freq = freq)
@@ -121,8 +134,7 @@ class RackScreenTest {
         val deck = find("Cassette").visibleBounds
 
         // tap the cassette: the rack opens
-        find("Cassette").click()
-        findText("CASSETTE RACK")
+        openRack()
         assertNotNull(device.wait(Until.findObject(By.text("ALBUMS 3")), 5_000))
         assertNotNull(device.findObject(By.text("SONGS 6")))
         assertNotNull(device.findObject(By.text("MIXTAPES 0")))
@@ -144,8 +156,7 @@ class RackScreenTest {
         waitFor("STOP") { vm.ui.value.transport == Transport.STOPPED }
 
         // the songs tab: a single song as a tape
-        find("Cassette").click()
-        findText("CASSETTE RACK")
+        openRack()
         findText("SONGS 6").click()
         Thread.sleep(400)
         shot("12-rack-songs")
@@ -153,8 +164,7 @@ class RackScreenTest {
         waitFor("a single in the deck") { vm.ui.value.tape.id.startsWith("song:") && vm.ui.value.queue.size == 1 }
 
         // hold a card to read it
-        find("Cassette").click()
-        findText("CASSETTE RACK")
+        openRack()
         findText("ALBUMS 3").click()
         Thread.sleep(300)
         find("Album A").longClick()
