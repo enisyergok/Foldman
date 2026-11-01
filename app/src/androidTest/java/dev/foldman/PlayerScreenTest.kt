@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Configurator
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -50,6 +51,12 @@ class PlayerScreenTest {
     /** Runs [block] on the main thread with the view model. */
     private fun withVm(block: (DeckViewModel) -> Unit) = onActivity { block(ViewModelProvider(it)[DeckViewModel::class.java]) }
 
+    init {
+        // The reels never stop turning while a tape plays, so there is no quiet moment to wait for.
+        Configurator.getInstance().waitForIdleTimeout = 0
+        Configurator.getInstance().waitForSelectorTimeout = 0
+    }
+
     private fun shot(name: String) {
         Thread.sleep(250)
         val dir = context.getExternalFilesDir("shots") ?: return
@@ -72,7 +79,7 @@ class PlayerScreenTest {
 
     private fun tap(desc: String) = find(desc).click()
 
-    private fun loadTape(count: Int = 3, seconds: Double = 10.0) {
+    private fun loadTape(count: Int = 3, seconds: Double = 30.0) {
         val tracks = (1..count).map { n ->
             val file = TestAudio.wav(File(context.cacheDir, "tape/0$n - Track $n.wav"), seconds, freq = 330.0 + 110 * n)
             LocalTrack(
@@ -104,9 +111,9 @@ class PlayerScreenTest {
         tap("Play")
         waitFor("PLAY") { vm.ui.value.transport == Transport.PLAYING }
         waitFor("the position to move") { vm.ui.value.positionMs > 600 }
+        assertEquals("title of the first song", "Track 1", vm.ui.value.title)
         Thread.sleep(600)
         shot("03-playing-$tag")
-        assertEquals("title of the first song", "Track 1", vm.ui.value.title)
 
         // seeking, as the position bar does it
         withVm { it.seekToFraction(0.5f) }
