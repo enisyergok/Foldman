@@ -170,6 +170,13 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { local.state.collect { autoReverseIfEnded(it) } }
     }
 
+    /** For tests: puts [list] on the tape directly, without scanning a folder. */
+    @androidx.annotation.VisibleForTesting
+    fun loadTracksForTest(list: List<LocalTrack>) {
+        selectSource(Source.LOCAL)
+        useTracks(list, Uri.EMPTY, reset = true)
+    }
+
     /** The app came to the front or went away; the loop only runs while it is in front. */
     fun setForeground(on: Boolean) {
         if (!on && winding != 0) finishWinding()

@@ -36,6 +36,7 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "APPLE_DEVELOPER_TOKEN", "\"$appleDeveloperToken\"")
         // Every current foldable is 64-bit ARM; leaving out the rest halves the APK.
         ndk {
@@ -100,6 +101,13 @@ dependencies {
     implementation(fileTree("libs") { include("*.aar", "*.jar") })
     // MusicKit's sign-in screen uses an AppCompat theme.
     implementation("androidx.appcompat:appcompat:1.8.0")
+
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     testImplementation("junit:junit:4.13.2")
     // The real org.json, so tests of code that reads and writes JSON don't get Android's empty stubs.

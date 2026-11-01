@@ -5,17 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import androidx.annotation.OptIn
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
-import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
-import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import dev.foldman.MainActivity
@@ -37,26 +30,7 @@ class PlaybackService : MediaSessionService() {
         refreshTone()
         prefs.registerOnSharedPreferenceChangeListener(toneListener)
 
-        val renderers = object : DefaultRenderersFactory(this) {
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean,
-            ): AudioSink = DefaultAudioSink.Builder(context)
-                // The tape first, then the tap that feeds the VU lamps, so they show what you hear.
-                .setAudioProcessors(arrayOf<AudioProcessor>(TapeAudioProcessor(), TeeAudioProcessor(AudioLevels)))
-                .build()
-        }
-        val player = ExoPlayer.Builder(this, renderers)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                /* handleAudioFocus = */ true,
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .build()
+        val player = PlaybackEngine.createPlayer(this)
         player.addListener(object : Player.Listener {
             override fun onTracksChanged(tracks: Tracks) = readGain(tracks)
         })
