@@ -11,6 +11,8 @@ jobs:
   device:
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +56,23 @@ jobs:
             instrument.txt
             logcat.txt
           if-no-files-found: warn
+
+      # Artifacts can't be fetched from everywhere, so the pictures also go to a branch of their own.
+      - name: Publish the screenshots to a branch
+        if: always()
+        run: |
+          rm -rf /tmp/pub && mkdir -p /tmp/pub
+          cp -r shots /tmp/pub/ 2>/dev/null || true
+          cp instrument.txt /tmp/pub/ 2>/dev/null || true
+          grep -E "foldman|AndroidRuntime|FATAL|Exception|MediaCodec|AudioTrack|ExoPlayer" logcat.txt | tail -n 4000 > /tmp/pub/logcat-filtered.txt || true
+          cd /tmp/pub
+          git init -q
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -q -b ci-screenshots
+          git add -A
+          git commit -q -m "Emulator screenshots for ${GITHUB_SHA}" || true
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-screenshots
 
       - name: The tests must have passed
         run: |

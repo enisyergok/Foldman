@@ -94,7 +94,7 @@ class PlayerScreenTest {
         waitFor("the position to move") { vm.ui.value.positionMs > 600 }
         Thread.sleep(800)
         shot("03-playing-$tag")
-        assertTrue("title should be the first song", vm.ui.value.title == "Track 1")
+        assertEquals("title of the first song", "Track 1", vm.ui.value.title)
 
         // the position bar seeks
         compose.onNodeWithContentDescription("Tape position").performSemanticsAction(SemanticsActions.SetProgress) { it(0.5f) }
