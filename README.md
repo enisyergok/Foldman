@@ -49,13 +49,15 @@ The portrait player is drawn from one piece of artwork with the moving parts lai
 | Control | What it does |
 | --- | --- |
 | **REW · PLAY · FF · STOP/EJECT · PAUSE** | The transport, latched like the mechanism. STOP/EJECT with the tape stopped opens the tape shelf. |
-| **Cassette** | Tap for the tape shelf (sources, albums, queue). Swipe up or down for the next or previous song. **Press and hold for the tape settings.** |
+| **Cassette** | Tap for the **cassette rack** (see below). Swipe up or down for the next or previous song. **Press and hold for the tape settings.** |
 | **Position bar** | Tap or drag to move through the song. |
 | **Volume knob** | Turn it with a finger; it follows the phone's volume keys. |
 | **TAPE** (or tap NORMAL / CrO₂ / METAL) | The tape type: a different tone for local music (CrO₂ brighter, METAL fuller at both ends). |
 | **NR** | A treble expander that takes the hiss down on local music. |
 | **MONITOR** | Keeps the screen lit while the tape runs. |
 | **PHONES A/B, MIC** | Decoration. |
+
+**The cassette rack.** Every album, every song and your mixtapes are tapes. Carry one to the cassette window by its cover or handle and let go: it drops in, stopped, and PLAY plays it. Hold a tape without moving to read its card. The blank tape at the end of the mixtapes makes a new mixtape: a name and songs in the order you like. (STOP/EJECT with the tape stopped, and SOURCES in the rack, still reach YT Music, Apple Music and the folder.)
 
 **Tape settings** (hold the cassette): wow and flutter, hiss, saturation and head bump (all at zero is the clean sound of the file), ReplayGain levelling, auto-reverse (the tape turns over at its end and plays on as side B) and a sleep timer that fades out over its last 15 seconds. The tape type, NR and these settings apply to music from a local folder; other apps' audio can't be processed.
 

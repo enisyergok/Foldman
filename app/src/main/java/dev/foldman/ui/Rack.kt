@@ -303,7 +303,7 @@ private fun RackHeader(count: Int, onSources: () -> Unit, onFolder: () -> Unit) 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("CASSETTE RACK", style = EngravedCaps.copy(color = RackDim, fontSize = 11.sp, letterSpacing = 3.sp))
         Spacer(Modifier.width(10.dp))
-        Text("$count TAPES", style = EngravedCaps.copy(color = RackOrange, fontSize = 9.sp, letterSpacing = 2.sp), modifier = Modifier.weight(1f))
+        Text(if (count == 1) "1 TAPE" else "$count TAPES", style = EngravedCaps.copy(color = RackOrange, fontSize = 9.sp, letterSpacing = 2.sp), modifier = Modifier.weight(1f))
         Text("FOLDER", style = EngravedCaps.copy(color = RackDim, fontSize = 9.sp), modifier = Modifier.clickable(onClick = onFolder).padding(8.dp))
         Text("SOURCES", style = EngravedCaps.copy(color = RackDim, fontSize = 9.sp), modifier = Modifier.clickable(onClick = onSources).padding(8.dp))
     }

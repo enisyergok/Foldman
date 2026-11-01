@@ -2,6 +2,21 @@
 
 All notable changes to Foldman. Versions follow [semantic versioning](https://semver.org); downloads are on the [releases page](https://github.com/deveshrai/Foldman/releases).
 
+## [0.3.0] — 2026-11-01
+
+### Added
+- **The cassette rack.** Tap the cassette (or press STOP/EJECT with the tape stopped) and a rack of tapes opens: every **album**, every **song** and your **mixtapes**, with a search box. Carry a tape to the cassette window by its cover or handle (or sideways from anywhere on the card, or hold then move) and let go: it drops into the deck, stopped, and **PLAY plays it**. A tap puts a tape in too.
+- **Tape cards.** Hold a tape without moving to read its card: cover, what is on it with each song's length, and what can be done with it (put it in, add a song to a mixtape, edit a mixtape).
+- **Mixtapes.** The blank tape at the end of the mixtapes makes a new one: a name, songs picked from the library and put in the order you like. They are kept on the phone.
+- Songs now carry their length (the library cache is rebuilt once to read them).
+
+### Changed
+- **The tape in the deck is the play queue.** An album plays through, a song plays alone, a mixtape plays in its order; the whole library is still there in the rack. The tape you chose is remembered.
+
+### Fixed
+- Pressing STOP could end up showing PAUSE when the player's last update still said it was playing.
+- The rack, tape cards and the mixtape editor announce themselves to screen readers as panes.
+
 ## [0.2.0] — 2026-11-01
 
 ### Changed
@@ -51,6 +66,7 @@ The first release.
 - **YT Music and Apple Music via media sessions.** Transport, artwork and queue, using notification access.
 - Adaptive launcher icon with a themed (monochrome) layer.
 
+[0.3.0]: https://github.com/deveshrai/Foldman/releases/tag/v0.3.0
 [0.2.0]: https://github.com/deveshrai/Foldman/releases/tag/v0.2.0
 [0.1.2]: https://github.com/deveshrai/Foldman/releases/tag/v0.1.2
 [0.1.1]: https://github.com/deveshrai/Foldman/releases/tag/v0.1.1
