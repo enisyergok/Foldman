@@ -52,6 +52,13 @@ class RackScreenTest {
         vm.ui.value.mixtapes.forEach { m -> compose.runOnUiThread { vm.deleteMixtape(m.id) } }
     }
 
+    private fun shotNow(name: String) {
+        val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
+        val dir = context.getExternalFilesDir("shots") ?: return
+        dir.mkdirs()
+        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
     private fun shot(name: String) {
         compose.waitForIdle()
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
@@ -96,7 +103,11 @@ class RackScreenTest {
         val end = deck.center
         // a real finger: system-level touch events, as the first passing run used
         val device = androidx.test.uiautomator.UiDevice.getInstance(instrumentation)
-        device.drag(start.x.toInt(), start.y.toInt(), end.x.toInt(), end.y.toInt(), 60)
+        android.util.Log.d("FoldmanRack", "test drag $start -> $end card=$card deck=$deck")
+        if (picture != null) {
+            Thread { Thread.sleep(700); shotNow(picture) }.start()
+        }
+        device.drag(start.x.toInt(), start.y.toInt(), end.x.toInt(), end.y.toInt(), 200)
         compose.waitForIdle()
     }
 

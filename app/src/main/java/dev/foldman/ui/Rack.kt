@@ -233,10 +233,11 @@ fun CassetteRack(
                                     onInsert = { actions.insert(tape); onClose() },
                                     onHold = { card = tape },
                                     onHoldEnd = { card = null },
-                                    onDragStart = { rootPos -> card = null; carry = Carry(tape, rootPos - origin) },
+                                    onDragStart = { rootPos -> android.util.Log.d("FoldmanRack", "carry start at $rootPos origin=$origin"); card = null; carry = Carry(tape, rootPos - origin) },
                                     onDrag = { rootPos -> carry = Carry(tape, rootPos - origin) },
                                     onDragEnd = { rootPos ->
                                         val dropped = carry
+                                        android.util.Log.d("FoldmanRack", "carry end at $rootPos origin=$origin deck=$deckBounds carried=${dropped?.tape?.id}")
                                         carry = null
                                         if (rootPos != null && dropped != null && deckBounds.translate(-origin).contains(rootPos - origin)) {
                                             actions.insert(dropped.tape)
