@@ -94,16 +94,9 @@ class RackScreenTest {
         val density = context.resources.displayMetrics.density
         val start = Offset(card.left + 40 * density, card.center.y)
         val end = deck.center
-        val root = compose.onRoot()
-        // like a finger: each step is its own injection, with the UI given time to react in between
-        root.performTouchInput { down(start) }
-        compose.waitForIdle()
-        for (i in 1..20) {
-            root.performTouchInput { moveTo(start + (end - start) * (i / 20f)) }
-            compose.waitForIdle()
-        }
-        if (picture != null) shot(picture)
-        root.performTouchInput { up() }
+        // a real finger: system-level touch events, as the first passing run used
+        val device = androidx.test.uiautomator.UiDevice.getInstance(instrumentation)
+        device.drag(start.x.toInt(), start.y.toInt(), end.x.toInt(), end.y.toInt(), 60)
         compose.waitForIdle()
     }
 
