@@ -43,7 +43,7 @@ class RackScreenTest {
     private lateinit var vm: DeckViewModel
 
     init {
-        Configurator.getInstance().waitForIdleTimeout = 0
+        Configurator.getInstance().waitForIdleTimeout = 600
         Configurator.getInstance().waitForSelectorTimeout = 0
     }
 

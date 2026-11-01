@@ -74,8 +74,8 @@ class PlayerScreenTest {
     private fun withVm(block: (DeckViewModel) -> Unit) = onActivity { block(vm) }
 
     init {
-        // The reels never stop turning while a tape plays, so there is no quiet moment to wait for.
-        Configurator.getInstance().waitForIdleTimeout = 0
+        // A short wait for the screen to settle (the reels never stop while a tape plays, so not a long one).
+        Configurator.getInstance().waitForIdleTimeout = 600
         Configurator.getInstance().waitForSelectorTimeout = 0
     }
 
