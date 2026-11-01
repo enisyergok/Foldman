@@ -65,6 +65,18 @@ class RackScreenTest {
         if (device.hasObject(By.textContains("isn't responding"))) device.findObject(By.text("Wait"))?.click()
     }
 
+    /** The screen's tree can refresh between finding a control and pressing it; find it again and press. */
+    private fun <T> steady(block: () -> T): T {
+        repeat(5) {
+            try {
+                return block()
+            } catch (_: androidx.test.uiautomator.StaleObjectException) {
+                Thread.sleep(300)
+            }
+        }
+        return block()
+    }
+
     private fun shot(name: String) {
         Thread.sleep(300)
         val dir = context.getExternalFilesDir("shots") ?: return
@@ -94,7 +106,7 @@ class RackScreenTest {
     /** Taps the cassette until the rack is up (a tap during a closing moment can be missed on a slow emulator). */
     private fun openRack() {
         repeat(3) {
-            find("Cassette").click()
+            steady { find("Cassette").click() }
             if (device.wait(Until.findObject(By.text("CASSETTE RACK")), 4_000) != null) return
             Thread.sleep(500)
         }
@@ -149,15 +161,15 @@ class RackScreenTest {
         shot("11-album-in-deck")
 
         // PLAY plays it
-        find("Play").click()
+        steady { find("Play").click() }
         waitFor("PLAY") { vm.ui.value.transport == Transport.PLAYING }
         waitFor("the first song") { vm.ui.value.title == "Beta One" }
-        find("Stop, eject").click()
+        steady { find("Stop, eject").click() }
         waitFor("STOP") { vm.ui.value.transport == Transport.STOPPED }
 
         // the songs tab: a single song as a tape
         openRack()
-        findText("SONGS 6").click()
+        steady { findText("SONGS 6").click() }
         Thread.sleep(400)
         shot("12-rack-songs")
         carryToDeck("Lonely Song", deck)
@@ -165,29 +177,29 @@ class RackScreenTest {
 
         // hold a card to read it
         openRack()
-        findText("ALBUMS 3").click()
+        steady { findText("ALBUMS 3").click() }
         Thread.sleep(300)
-        find("Album A").longClick()
+        steady { find("Album A").longClick() }
         Thread.sleep(1000)
         shot("13-card")
         assertNotNull("the card did not open", device.wait(Until.findObject(By.text("INSERT")), 15_000))
         assertNotNull(device.findObject(By.text("Alpha Three")))
-        findText("CLOSE").click()
+        steady { findText("CLOSE").click() }
         Thread.sleep(300)
 
         // the blank mixtape
-        findText("MIXTAPES 0").click()
+        steady { findText("MIXTAPES 0").click() }
         Thread.sleep(300)
         shot("14-rack-mixtapes")
-        find("Blank mixtape").click()
+        steady { find("Blank mixtape").click() }
         findText("NEW MIXTAPE")
         // (the name is left blank: a blank name becomes "Mixtape 1")
         assertNotNull(device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10_000))
-        device.wait(Until.findObject(By.descStartsWith("Beta Two")), 10_000).click()
-        device.wait(Until.findObject(By.descStartsWith("Alpha One")), 10_000).click()
+        steady { device.wait(Until.findObject(By.descStartsWith("Beta Two")), 10_000).click() }
+        steady { device.wait(Until.findObject(By.descStartsWith("Alpha One")), 10_000).click() }
         assertNotNull("the mixtape count", device.wait(Until.findObject(By.textStartsWith("ON THIS TAPE · 2")), 10_000))
         shot("15-mixtape-editor")
-        findText("SAVE").click()
+        steady { findText("SAVE").click() }
         waitFor("the mixtape") { vm.ui.value.mixtapes.size == 1 && vm.ui.value.mixtapes[0].name == "Mixtape 1" }
         assertEquals(2, vm.ui.value.mixtapes[0].keys.size)
         assertNotNull(device.wait(Until.findObject(By.text("MIXTAPES 1")), 10_000))
@@ -196,10 +208,10 @@ class RackScreenTest {
         // and the mixtape goes in the deck, songs in the order they were picked
         carryToDeck("Mixtape 1", deck)
         waitFor("the mixtape in the deck") { vm.ui.value.tape.id.startsWith("mix:") && vm.ui.value.queue.size == 2 }
-        find("Play").click()
+        steady { find("Play").click() }
         waitFor("the mixtape's first song") { vm.ui.value.transport == Transport.PLAYING && vm.ui.value.title == "Beta Two" }
         shot("17-mixtape-playing")
         assertTrue(vm.ui.value.tape.title == "Mixtape 1")
-        find("Stop, eject").click()
+        steady { find("Stop, eject").click() }
     }
 }

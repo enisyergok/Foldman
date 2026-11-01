@@ -84,6 +84,18 @@ class PlayerScreenTest {
         if (device.hasObject(By.textContains("isn't responding"))) device.findObject(By.text("Wait"))?.click()
     }
 
+    /** The screen's tree can refresh between finding a control and pressing it; find it again and press. */
+    private fun <T> steady(block: () -> T): T {
+        repeat(5) {
+            try {
+                return block()
+            } catch (_: androidx.test.uiautomator.StaleObjectException) {
+                Thread.sleep(300)
+            }
+        }
+        return block()
+    }
+
     private fun shot(name: String) {
         Thread.sleep(250)
         val dir = context.getExternalFilesDir("shots") ?: return
@@ -104,7 +116,7 @@ class PlayerScreenTest {
     private fun find(desc: String): UiObject2 =
         dismissSystemBox().let { device }.wait(Until.findObject(By.desc(desc)), 10_000) ?: throw AssertionError("no control called \"$desc\" on screen")
 
-    private fun tap(desc: String) = find(desc).click()
+    private fun tap(desc: String) = steady { find(desc).click() }
 
     private fun loadTape(count: Int = 3, seconds: Double = 120.0) {
         val tracks = (1..count).map { n ->
@@ -177,12 +189,12 @@ class PlayerScreenTest {
         shot("06-metal-nr-$tag")
 
         // hold the cassette: the tape settings
-        (device.wait(Until.findObject(By.descStartsWith("Cassette")), 10_000) ?: throw AssertionError("no cassette on screen")).longClick()
+        steady { (device.wait(Until.findObject(By.descStartsWith("Cassette")), 10_000) ?: throw AssertionError("no cassette on screen")).longClick() }
         assertNotNull("tape settings did not open", device.wait(Until.findObject(By.text("Wow and flutter")), 10_000))
         shot("07-settings-$tag")
-        device.findObject(By.text("Auto-reverse")).click()
+        steady { device.findObject(By.text("Auto-reverse")).click() }
         waitFor("auto-reverse") { vm.ui.value.autoReverse }
-        device.findObject(By.text("Level songs (ReplayGain)")).click()
+        steady { device.findObject(By.text("Level songs (ReplayGain)")).click() }
         waitFor("replay gain") { vm.ui.value.character.replayGain }
         withVm { it.setTapeCharacter("tape_wow", 0.5f) }
         waitFor("wow in the engine") { abs(TapeParams.current.wow - 0.5f) < 0.01f }
