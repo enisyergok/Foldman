@@ -42,6 +42,27 @@ Every key is a latching mechanism, and the cassette behind the window follows it
 
 The keys click (the sounds are synthesised, not samples) and buzz under your thumb. The tape counter is geared to the take-up reel, the VU needles follow the real audio on local files, and the tape packs on the reels show how far through the song you are.
 
+## Everything on the player works
+
+The portrait player is drawn from one piece of artwork with the moving parts laid over it, and every control on it does something:
+
+| Control | What it does |
+| --- | --- |
+| **REW · PLAY · FF · STOP/EJECT · PAUSE** | The transport, latched like the mechanism. STOP/EJECT with the tape stopped opens the tape shelf. |
+| **Cassette** | Tap for the tape shelf (sources, albums, queue). Swipe up or down for the next or previous song. **Press and hold for the tape settings.** |
+| **Position bar** | Tap or drag to move through the song. |
+| **Volume knob** | Turn it with a finger; it follows the phone's volume keys. |
+| **TAPE** (or tap NORMAL / CrO₂ / METAL) | The tape type: a different tone for local music (CrO₂ brighter, METAL fuller at both ends). |
+| **NR** | A treble expander that takes the hiss down on local music. |
+| **MONITOR** | Keeps the screen lit while the tape runs. |
+| **PHONES A/B, MIC** | Decoration. |
+
+**Tape settings** (hold the cassette): wow and flutter, hiss, saturation and head bump (all at zero is the clean sound of the file), ReplayGain levelling, auto-reverse (the tape turns over at its end and plays on as side B) and a sleep timer that fades out over its last 15 seconds. The tape type, NR and these settings apply to music from a local folder; other apps' audio can't be processed.
+
+On a tall phone the artwork gets extra plain body above the brand name and between the window and the counter, so it fills the screen without stretching anything.
+
+> **Artwork.** The player artwork was cut from a third-party render and shows Sony, Walkman and Dolby names. It is not covered by the Apache License (see [NOTICE](NOTICE)); replace it before you publish or distribute the app.
+
 ## Folded, unfolded, half-open
 
 Foldman reads the hinge and rebuilds itself for each posture, without stopping the music.

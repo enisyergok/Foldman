@@ -87,7 +87,14 @@ class LocalBackend(private val context: Context) : DeckBackend {
             val sameQueue = c.mediaItemCount == newTracks.size && newTracks.isNotEmpty() &&
                 (0 until c.mediaItemCount).all { c.getMediaItemAt(it).mediaId == newTracks[it].uri.toString() }
             if (!sameQueue || startIndex != null) {
-                c.setMediaItems(newTracks.map(::toMediaItem), startIndex ?: 0, 0L)
+                // A changed list keeps the song that is playing (and where it is) if it is still in it.
+                val playingId = if (startIndex == null && c.mediaItemCount > 0) c.currentMediaItem?.mediaId else null
+                val keep = playingId?.let { id -> newTracks.indexOfFirst { it.uri.toString() == id } } ?: -1
+                if (keep >= 0) {
+                    c.setMediaItems(newTracks.map(::toMediaItem), keep, c.currentPosition)
+                } else {
+                    c.setMediaItems(newTracks.map(::toMediaItem), startIndex ?: 0, 0L)
+                }
                 c.prepare()
             } else {
                 refreshTitles(c, newTracks)

@@ -18,7 +18,8 @@ Foldman has no accounts, analytics, ads or servers of its own. Everything it kno
 Foldman keeps a few settings in its private app storage:
 - the source in the deck;
 - the music folder you picked;
-- the CLICK and HAPTIC switch positions;
+- the CLICK and HAPTIC switch positions, the tape settings (TAPE, NR, wow, hiss and so on) and the sleep timer's choice;
+- a list of the songs found in your music folder (their file addresses, names, tags and sizes), so the next start is quick. It lives in the app's private storage, is rebuilt from the folder, and is deleted with the app;
 - your Apple Music **user token**, after you sign in, and a developer token if you pasted one in.
 
 None of it leaves the phone. Foldman opts out of Android's cloud backup and of device-to-device transfer, so your Apple Music token isn't copied into a backup or onto a new phone; on a new phone you sign in again. Uninstalling Foldman deletes it all.

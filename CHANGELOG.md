@@ -2,6 +2,29 @@
 
 All notable changes to Foldman. Versions follow [semantic versioning](https://semver.org); downloads are on the [releases page](https://github.com/deveshrai/Foldman/releases).
 
+## [0.2.0] — 2026-11-01
+
+### Changed
+- **The player is now drawn from a single piece of artwork**, with every moving part laid over it: the five keys latch like the mechanism, the reels turn (and blur while winding), the volume knob is turned with a finger, the position bar can be tapped or dragged, and the clock, mode symbol and lamps are live. Title and artist are written on the cassette label.
+- **The tape on the reels now grows and shrinks** with the song: the take-up reel fills while the supply reel empties.
+- **Tall phones no longer get black bars.** Extra plain body is added above the brand name and between the window and the counter; the keys, window and dials keep their size.
+- **Sound.** The TAPE and NR controls are now a real signal chain on local playback (tape-type curves, a treble expander for NR) instead of an equaliser, and the VU lamps read with proper VU ballistics.
+
+### Added
+- **Tape settings** (press and hold the cassette): wow and flutter, hiss, saturation, head bump, ReplayGain levelling, auto-reverse (side B) and a sleep timer that fades out over its last 15 seconds.
+- **Side B.** With auto-reverse on, the tape turns over at its end and plays on; the label shows B and the reels swap jobs.
+- **Faster starts for big libraries.** The library is remembered between runs and only new or changed files are read again. All tags are read now (it was the first 600), three files at a time.
+- **Screen reader support** for the keys, knob, position bar, switches and cassette, with state announcements and custom actions.
+- **Unit tests** (sound engine, library cache, reel physics, lamp scale, body stretch) run on every build.
+
+### Fixed
+- Albums with the same folder name in different places are no longer merged.
+- Apple Music commands sent before its player process is up (or while it restarts) are held and sent, not lost.
+- The update loop rests while the app is off screen, saving battery.
+- Cover pictures are only fetched over https or from content providers and are size-limited.
+- Old folder permissions are released when a new folder is chosen.
+- A changed folder no longer restarts the song that is playing.
+
 ## [0.1.2] — 2026-10-21
 
 ### Changed
@@ -28,6 +51,7 @@ The first release.
 - **YT Music and Apple Music via media sessions.** Transport, artwork and queue, using notification access.
 - Adaptive launcher icon with a themed (monochrome) layer.
 
+[0.2.0]: https://github.com/deveshrai/Foldman/releases/tag/v0.2.0
 [0.1.2]: https://github.com/deveshrai/Foldman/releases/tag/v0.1.2
 [0.1.1]: https://github.com/deveshrai/Foldman/releases/tag/v0.1.1
 [0.1.0]: https://github.com/deveshrai/Foldman/releases/tag/v0.1.0

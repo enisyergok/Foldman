@@ -16,3 +16,9 @@ Third-party software bundled in release builds:
   Apple Developer Program License Agreement. It is not part of this repository's source and is
   not covered by the Apache License.
 - AndroidX, Jetpack Compose and Media3, (c) The Android Open Source Project, Apache License 2.0.
+
+Artwork:
+- The player's artwork (the res/drawable-nodpi/wm_* pictures) was cut from a third-party render
+  supplied by the repository owner. It shows the Sony and Walkman names and the Dolby mark and is
+  NOT covered by the Apache License. Replace it with artwork you have the rights to before
+  publishing or distributing the app.
