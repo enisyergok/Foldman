@@ -192,7 +192,12 @@ class PlayerScreenTest {
         // auto-reverse: play the last song to its end and the tape turns over
         withVm { it.playTrack(2) }
         waitFor("last song") { vm.ui.value.trackIndex == 2 && vm.ui.value.transport == Transport.PLAYING }
-        withVm { it.seekToFraction(0.97f) }
+        waitFor("the song's length") { vm.ui.value.durationMs > 0 }
+        // a seek before the length is known is ignored, so ask until it has taken
+        waitFor("a seek to the end") {
+            withVm { it.seekToFraction(0.97f) }
+            vm.ui.value.progress > 0.9f || vm.ui.value.side == 1
+        }
         waitFor("side B", 30_000) { vm.ui.value.side == 1 }
         Thread.sleep(1200)
         assertEquals(0, vm.ui.value.trackIndex)
