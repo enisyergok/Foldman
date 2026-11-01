@@ -79,6 +79,11 @@ class PlayerScreenTest {
         Configurator.getInstance().waitForSelectorTimeout = 0
     }
 
+    /** A slow emulator sometimes makes a system app miss a beat and shows a box over the test: wait it out. */
+    private fun dismissSystemBox() {
+        if (device.hasObject(By.textContains("isn't responding"))) device.findObject(By.text("Wait"))?.click()
+    }
+
     private fun shot(name: String) {
         Thread.sleep(250)
         val dir = context.getExternalFilesDir("shots") ?: return
@@ -97,7 +102,7 @@ class PlayerScreenTest {
     }
 
     private fun find(desc: String): UiObject2 =
-        device.wait(Until.findObject(By.desc(desc)), 10_000) ?: throw AssertionError("no control called \"$desc\" on screen")
+        dismissSystemBox().let { device }.wait(Until.findObject(By.desc(desc)), 10_000) ?: throw AssertionError("no control called \"$desc\" on screen")
 
     private fun tap(desc: String) = find(desc).click()
 
@@ -117,6 +122,7 @@ class PlayerScreenTest {
     @Test
     fun theWholePlayer() {
         Thread.sleep(1500)
+        dismissSystemBox()
         val display = context.resources.displayMetrics
         val tag = "${display.widthPixels}x${display.heightPixels}"
         shot("01-launch-$tag")

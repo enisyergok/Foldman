@@ -60,6 +60,11 @@ class RackScreenTest {
 
     private fun withVm(block: (DeckViewModel) -> Unit) = scenario.scenario.onActivity { block(vm) }
 
+    /** A slow emulator sometimes makes a system app miss a beat and shows a box over the test: wait it out. */
+    private fun dismissSystemBox() {
+        if (device.hasObject(By.textContains("isn't responding"))) device.findObject(By.text("Wait"))?.click()
+    }
+
     private fun shot(name: String) {
         Thread.sleep(300)
         val dir = context.getExternalFilesDir("shots") ?: return
@@ -78,7 +83,7 @@ class RackScreenTest {
     }
 
     private fun find(selectorDesc: String): UiObject2 =
-        device.wait(Until.findObject(By.descStartsWith(selectorDesc)), 10_000) ?: throw AssertionError("nothing described \"$selectorDesc\" on screen")
+        dismissSystemBox().let { device }.wait(Until.findObject(By.descStartsWith(selectorDesc)), 10_000) ?: throw AssertionError("nothing described \"$selectorDesc\" on screen")
 
     private fun findText(text: String): UiObject2 =
         device.wait(Until.findObject(By.text(text)), 10_000) ?: throw AssertionError("no text \"$text\" on screen")
@@ -102,6 +107,7 @@ class RackScreenTest {
     @Test
     fun theRack() {
         Thread.sleep(1500)
+        dismissSystemBox()
         withVm {
             it.loadTracksForTest(
                 listOf(

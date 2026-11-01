@@ -45,6 +45,11 @@ jobs:
             adb shell settings put global window_animation_scale 0
             adb shell settings put global transition_animation_scale 0
             adb shell settings put global animator_duration_scale 0
+            # an "isn't responding" box from the launcher during boot would sit over the first test
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS || true
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            adb shell input keyevent KEYCODE_HOME || true
+            sleep 5
             adb logcat -c
             adb shell am instrument -w dev.foldman.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee instrument.txt || true
             adb logcat -d > logcat.txt || true
