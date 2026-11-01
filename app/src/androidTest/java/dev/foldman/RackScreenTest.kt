@@ -194,7 +194,8 @@ class RackScreenTest {
         waitFor("the mixtape in the deck") { vm.ui.value.tape.id.startsWith("mix:") && vm.ui.value.queue.size == 2 }
         compose.runOnUiThread { vm.play() }
         waitFor("the mixtape's first song") { vm.ui.value.transport == Transport.PLAYING && vm.ui.value.title == "Beta Two" }
-        shot("17-mixtape-playing")
+        Thread.sleep(500)
+        shotNow("17-mixtape-playing") // the reels never go idle while playing
         assertEquals("Road trip", vm.ui.value.tape.title)
         stopAndWaitUntilStill()
     }
