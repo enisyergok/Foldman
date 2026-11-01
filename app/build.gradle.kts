@@ -45,6 +45,14 @@ android {
     }
 
     signingConfigs {
+        // One fixed debug key (it is not a secret), so every build, wherever it was made, is signed alike
+        // and a new build installs over the last one.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (signingProps.getProperty("storeFile") != null) {
             create("release") {
                 storeFile = file(signingProps.getProperty("storeFile"))

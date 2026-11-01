@@ -13,3 +13,6 @@ app/libs/*.aar
 signing.properties
 *.jks
 *.keystore
+
+# The shared debug key is not a secret and is kept so every build is signed alike
+!app/debug.keystore
