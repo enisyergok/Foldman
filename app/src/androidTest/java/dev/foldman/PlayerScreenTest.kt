@@ -147,7 +147,7 @@ class PlayerScreenTest {
         shot("06-metal-nr-$tag")
 
         // hold the cassette: the tape settings
-        find("Cassette: Track 1 - Test Band").longClick()
+        (device.wait(Until.findObject(By.descStartsWith("Cassette")), 10_000) ?: throw AssertionError("no cassette on screen")).longClick()
         assertNotNull("tape settings did not open", device.wait(Until.findObject(By.text("Wow and flutter")), 10_000))
         shot("07-settings-$tag")
         device.findObject(By.text("Auto-reverse")).click()
