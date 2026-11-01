@@ -2,6 +2,8 @@ package dev.foldman
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        fitOrientation(resources.configuration)
         setContent {
             val windowLayout by remember { WindowInfoTracker.getOrCreate(this).windowLayoutInfo(this) }
                 .collectAsStateWithLifecycle<WindowLayoutInfo?>(initialValue = null)
@@ -59,6 +62,26 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Folding and unfolding swaps screens without recreating the activity.
+        fitOrientation(newConfig)
+    }
+
+    /**
+     * Small screens (ordinary phones, a foldable's cover screen) stay upright: held sideways they
+     * are too short for the deck layout, and the upright player is what they're designed for.
+     * Big screens (an unfolded foldable, a tablet) turn freely.
+     */
+    private fun fitOrientation(config: Configuration) {
+        val wanted = if (config.smallestScreenWidthDp < 600) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        if (requestedOrientation != wanted) requestedOrientation = wanted
     }
 
     override fun onResume() {
