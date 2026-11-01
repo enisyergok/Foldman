@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.localToRoot
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -392,7 +393,9 @@ private fun TapeCard(
     onDrag: (Offset) -> Unit,
     onDragEnd: (Offset?) -> Unit,
 ) {
-    var rootPos by remember { mutableStateOf(Offset.Zero) }
+    // The card moves with the panel while a tape is carried, so where the finger is on screen is worked out
+    // from the card's layout as it is at that moment, never from where it was when it was first laid out.
+    var layout by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     val insert by rememberUpdatedState(onInsert)
     val hold by rememberUpdatedState(onHold)
     val holdEnd by rememberUpdatedState(onHoldEnd)
@@ -408,7 +411,7 @@ private fun TapeCard(
         Modifier
             .fillMaxWidth()
             .height(68.dp)
-            .onGloballyPositioned { rootPos = it.positionInRoot() }
+            .onGloballyPositioned { layout = it }
             .clip(shape)
             .background(Brush.horizontalGradient(listOf(Color(0xFF3A2E25), Color(0xFF2B221B))))
             .border(if (inDeck) BorderStroke(1.5.dp, RackOrange) else BorderStroke(1.dp, Color(0x22FFFFFF)), shape)
@@ -424,6 +427,7 @@ private fun TapeCard(
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     val slop = viewConfiguration.touchSlop
+                    fun onScreen(p: Offset): Offset = layout?.takeIf { it.isAttached }?.localToRoot(p) ?: p
                     val held = awaitLongPressOrCancellation(down.id)
                     if (held != null) {
                         // Held still: the card opens. If the finger then moves, the tape is picked up instead.
@@ -436,15 +440,15 @@ private fun TapeCard(
                             if (!picked && (change.position - held.position).getDistance() > slop * 2f) {
                                 picked = true
                                 holdEnd()
-                                dragStart(rootPos + change.position)
+                                dragStart(onScreen(change.position))
                             }
                             if (picked) {
                                 change.consume()
-                                dragMove(rootPos + change.position)
+                                dragMove(onScreen(change.position))
                             }
                             last = change.position
                         }
-                        if (picked) dragEnd(rootPos + last)
+                        if (picked) dragEnd(onScreen(last))
                         return@awaitEachGesture
                     }
                     val now = currentEvent.changes.firstOrNull { it.id == down.id }
@@ -459,15 +463,15 @@ private fun TapeCard(
                     // Up and down on the card is the list scrolling, unless its cover or handle was grabbed.
                     val onGrip = down.position.x <= gripLeft || down.position.x >= size.width - gripRight
                     if (!sideways && !onGrip) return@awaitEachGesture
-                    dragStart(rootPos + now.position)
+                    dragStart(onScreen(now.position))
                     now.consume()
                     var last = now.position
                     val completed = drag(down.id) { change ->
                         change.consume()
                         last = change.position
-                        dragMove(rootPos + change.position)
+                        dragMove(onScreen(change.position))
                     }
-                    dragEnd(if (completed) rootPos + last else null)
+                    dragEnd(if (completed) onScreen(last) else null)
                 }
             }
             .padding(8.dp),
