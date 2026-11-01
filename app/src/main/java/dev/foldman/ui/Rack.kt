@@ -226,7 +226,7 @@ fun CassetteRack(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(8.dp))
-                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), userScrollEnabled = !carrying, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(shown, key = { it.id }) { tape ->
                                 TapeCard(
                                     tape = tape, inDeck = tape.id == ui.tape.id,
@@ -458,18 +458,21 @@ private fun TapeCard(
                         insert()
                         return@awaitEachGesture
                     }
-                    android.util.Log.d("FoldmanRack", "foldman rack: after slop now=${now.position} consumed=${now.isConsumed}")
-                    if (now.isConsumed) return@awaitEachGesture
                     val dx = now.position.x - down.position.x
                     val dy = now.position.y - down.position.y
                     val sideways = abs(dx) > abs(dy) * 1.2f
                     // Up and down on the card is the list scrolling, unless its cover or handle was grabbed.
                     val onGrip = down.position.x <= gripLeft || down.position.x >= size.width - gripRight
                     if (!sideways && !onGrip) return@awaitEachGesture
+                    // The list's own scrolling may already have claimed this move (it looks first); a tape grabbed
+                    // by its cover, handle or sideways is carried all the same, and the list is held still meanwhile.
                     dragStart(onScreen(now.position))
                     now.consume()
                     var last = now.position
-                    val completed = drag(down.id) { change ->
+                    var completed = false
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) { completed = true; break }
                         change.consume()
                         last = change.position
                         dragMove(onScreen(change.position))
