@@ -79,9 +79,10 @@ class PlayerScreenTest {
 
     private fun tap(desc: String) = find(desc).click()
 
-    private fun loadTape(count: Int = 3, seconds: Double = 30.0) {
+    private fun loadTape(count: Int = 3, seconds: Double = 120.0) {
         val tracks = (1..count).map { n ->
-            val file = TestAudio.wav(File(context.cacheDir, "tape/0$n - Track $n.wav"), seconds, freq = 330.0 + 110 * n)
+            // 8 kHz mono keeps two-minute songs small; the emulator is slow, so the songs are long
+            val file = TestAudio.wav(File(context.cacheDir, "tape/0$n - Track $n.wav"), seconds, rate = 8000, channels = 1, freq = 330.0 + 110 * n)
             LocalTrack(
                 uri = Uri.fromFile(file), title = "Track $n", artist = "Test Band", folder = "Test Album",
                 coverUri = null, folderPath = "Test Album", size = file.length(), modified = file.lastModified(), tagged = true,
@@ -167,8 +168,8 @@ class PlayerScreenTest {
         // auto-reverse: play the last song to its end and the tape turns over
         withVm { it.playTrack(2) }
         waitFor("last song") { vm.ui.value.trackIndex == 2 && vm.ui.value.transport == Transport.PLAYING }
-        withVm { it.seekToFraction(0.9f) }
-        waitFor("side B", 20_000) { vm.ui.value.side == 1 }
+        withVm { it.seekToFraction(0.97f) }
+        waitFor("side B", 30_000) { vm.ui.value.side == 1 }
         Thread.sleep(1200)
         assertEquals(0, vm.ui.value.trackIndex)
         shot("08-side-b-$tag")
