@@ -82,6 +82,7 @@ import dev.foldman.deck.SourceStatus
 import dev.foldman.deck.Transport
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -124,6 +125,12 @@ private const val KNOB_MAX = 145f
 /** The picture's own pointer sits at this angle (volume about 6). */
 private const val KNOB_ART_ANGLE = 28f
 
+/** The cassette window's frame: where its picture is cut from, its top edge, height, and how much bigger it may be drawn. */
+private val WINDOW_CROP = Offset(108f, 342f)
+private val WINDOW_PIVOT = Offset(385f, 344f)
+private const val WINDOW_H = 763f
+private const val WINDOW_GROWTH = 0.10f
+
 private val HUB_TOP = Offset(370f, 578f)
 private val HUB_BOTTOM = Offset(370f, 885f)
 
@@ -145,6 +152,7 @@ private val ORANGE = Color(0xFFF47A14)
 /** The pictures the player is made of. */
 private class Art(
     val body: ImageBitmap,
+    val window: ImageBitmap,
     val keyUp: Map<String, ImageBitmap>,
     val keyDn: Map<String, ImageBitmap>,
     val playOn: ImageBitmap,
@@ -170,6 +178,7 @@ private class Art(
 @Composable
 fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier: Modifier = Modifier) {
     val bg = ImageBitmap.imageResource(R.drawable.wm_bg)
+    val window = ImageBitmap.imageResource(R.drawable.wm_window)
     val keyUp = KEY_ART.associate { it.id to ImageBitmap.imageResource(keyRes(it.id, down = false)) }
     val keyDn = KEY_ART.filter { it.id != "play" }.associate { it.id to ImageBitmap.imageResource(keyRes(it.id, down = true)) }
     val playOn = ImageBitmap.imageResource(R.drawable.wm_key_play_on)
@@ -239,11 +248,14 @@ fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier:
         val s = min(maxWidth.value / ART_W, maxHeight.value / artHeight)
         val body = remember(bg, topRows, midRows) { stretchedBody(bg, topRows, midRows) }
         val art = Art(
-            body, keyUp, keyDn, playOn, capOn, capOff, hubTop, hubBottom, coverTop, detailTop, coverBottom, detailBottom,
+            body, window, keyUp, keyDn, playOn, capOn, capOff, hubTop, hubBottom, coverTop, detailTop, coverBottom, detailBottom,
             knob, thumb, slide, sideB,
         )
         val dyTop = topRows.toFloat()
         val dyLow = (topRows + midRows).toFloat()
+        // With room to spare below it, the cassette window is drawn larger (it grows down and sideways
+        // from its top edge, as far as the margins of the case allow).
+        val ws = 1f + min(WINDOW_GROWTH, max(0f, (midRows - 60f) / WINDOW_H))
 
         Box(Modifier.align(Alignment.Center).size((ART_W * s).dp, (artHeight * s).dp)) {
             Canvas(Modifier.fillMaxSize()) {
@@ -253,9 +265,12 @@ fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier:
                     if (ui.monitor) drawMonitorSpark()
                     // the cassette, the dials and switches: below the extra rows above the brand name
                     translate(0f, dyTop) {
-                        drawTitle(titleLayout)
-                        if (ui.side == 1) img(art.sideB, 200f, 422f)
-                        drawReels(anim, ui.side == 1, art)
+                        scale(ws, ws, WINDOW_PIVOT) {
+                            img(art.window, WINDOW_CROP.x, WINDOW_CROP.y)
+                            drawTitle(titleLayout)
+                            if (ui.side == 1) img(art.sideB, 200f, 422f)
+                            drawReels(anim, ui.side == 1, art)
+                        }
                         drawTapeLamps(ui.tapeType, pressed["tape"] == true)
                         drawSlide(art.slide, nr)
                         drawKnob(art.knob, volumeAngle.value)
@@ -301,7 +316,9 @@ fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier:
             val next by rememberUpdatedState(a.next)
             val previous by rememberUpdatedState(a.previous)
             Box(
-                Modifier.at(116f, 350f + dyTop, 545f, 750f, s)
+                Modifier.at(
+                    WINDOW_PIVOT.x - (WINDOW_PIVOT.x - 110f) * ws, WINDOW_PIVOT.y + dyTop, 550f * ws, WINDOW_H * ws, s,
+                )
                     .semantics {
                         role = Role.Button
                         contentDescription = "Cassette: $titleText"
