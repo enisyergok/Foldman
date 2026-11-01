@@ -16,8 +16,10 @@ import dev.foldman.deck.DeckViewModel
 import dev.foldman.deck.LocalTrack
 import dev.foldman.deck.Transport
 import dev.foldman.playback.TapeParams
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -46,10 +48,30 @@ class PlayerScreenTest {
         return result as T
     }
 
-    private val vm: DeckViewModel get() = onActivity { ViewModelProvider(it)[DeckViewModel::class.java] }
+    private lateinit var vm: DeckViewModel
+
+    /** Every mode the transport has been in since the test began (the emulator can be slower than a key's travel). */
+    private val seen = java.util.concurrent.CopyOnWriteArraySet<Transport>()
+    @Volatile private var recording = true
+
+    @Before
+    fun grabTheViewModel() {
+        onActivity { vm = ViewModelProvider(it)[DeckViewModel::class.java] }
+        Thread {
+            while (recording) {
+                seen.add(vm.ui.value.transport)
+                Thread.sleep(10)
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    @After
+    fun stopRecording() {
+        recording = false
+    }
 
     /** Runs [block] on the main thread with the view model. */
-    private fun withVm(block: (DeckViewModel) -> Unit) = onActivity { block(ViewModelProvider(it)[DeckViewModel::class.java]) }
+    private fun withVm(block: (DeckViewModel) -> Unit) = onActivity { block(vm) }
 
     init {
         // The reels never stop turning while a tape plays, so there is no quiet moment to wait for.
@@ -133,11 +155,13 @@ class PlayerScreenTest {
 
         // fast forward and stop
         tap("Fast forward")
-        waitFor("FF") { vm.ui.value.transport == Transport.FAST_FORWARDING }
-        Thread.sleep(300)
-        shot("05-winding-$tag")
-        tap("Stop, eject")
-        waitFor("STOP") { vm.ui.value.transport == Transport.STOPPED }
+        waitFor("FF") { Transport.FAST_FORWARDING in seen }
+        // it either gets stopped by hand or runs to the end of the tape; both end in STOP
+        if (vm.ui.value.transport != Transport.STOPPED) {
+            shot("05-winding-$tag")
+            tap("Stop, eject")
+        }
+        waitFor("STOP", 30_000) { vm.ui.value.transport == Transport.STOPPED }
 
         // the TAPE button steps through the three types, and the audio engine hears it
         repeat(2) { tap("Tape type"); Thread.sleep(150) }
