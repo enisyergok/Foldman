@@ -59,7 +59,7 @@ class PlayerScreenTest {
         throw AssertionError("timed out waiting for: $what (transport=${vm.ui.value.transport}, side=${vm.ui.value.side}, pos=${vm.ui.value.positionMs})")
     }
 
-    private fun loadTape(count: Int = 3, seconds: Double = 3.0) {
+    private fun loadTape(count: Int = 3, seconds: Double = 10.0) {
         val tracks = (1..count).map { n ->
             val name = "0$n - Track $n.wav"
             val file = TestAudio.wav(File(context.cacheDir, "tape/$name"), seconds, freq = 330.0 + 110 * n)
