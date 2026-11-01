@@ -110,6 +110,9 @@ dependencies {
     // MusicKit's sign-in screen uses an AppCompat theme.
     implementation("androidx.appcompat:appcompat:1.8.0")
 
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
