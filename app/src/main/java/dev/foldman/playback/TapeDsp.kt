@@ -179,7 +179,7 @@ class TapeDsp(private val sampleRate: Int, private val channels: Int, seed: Int 
                 if (nrSmooth > 0.0) {
                     nrLow[c] += (x - nrLow[c]) * nrLowCoef
                     val hf = x - nrLow[c]
-                    val level = abs(hf).toDouble()
+                    val level = abs(hf)
                     nrEnv[c] += (level - nrEnv[c]) * (if (level > nrEnv[c]) envAttack else envRelease)
                     val gain = if (nrEnv[c] >= NR_THRESHOLD) 1.0 else max(NR_FLOOR, nrEnv[c] / NR_THRESHOLD)
                     x += (hf * (gain - 1.0) * nrSmooth).toFloat()

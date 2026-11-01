@@ -30,9 +30,11 @@ class WalkmanMathTest {
     fun lampsFollowThePrintedScale() {
         // 0 VU (needle at 20/23) is at the "0" on the printed scale, about the 20th lamp of 30.
         assertTrue(lit(20f / 23f) in 19..21)
-        // A needle at the top of its travel lights nearly all of them, never more than there are.
-        assertTrue(lit(1f) in 25..30)
-        assertEquals(30, lit(1.08f).coerceAtMost(30))
+        // +3 VU (needle at 1.0) is the +3 on the printed scale; the needle's stop (1.08) is a little beyond.
+        assertTrue(lit(1f) in 23..25)
+        assertTrue(lit(1.08f) in 26..28)
+        // Nothing the needle can do lights more lamps than there are.
+        assertTrue(lit(5f) <= 30)
     }
 
     @Test
