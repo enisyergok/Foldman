@@ -158,9 +158,10 @@ class RackScreenTest {
         findText("ALBUMS 3").click()
         Thread.sleep(300)
         find("Album A").longClick()
-        assertNotNull("the card did not open", device.wait(Until.findObject(By.desc("Card of Album A")), 10_000))
-        assertNotNull(device.findObject(By.text("Alpha Three")))
+        Thread.sleep(1000)
         shot("13-card")
+        assertNotNull("the card did not open", device.wait(Until.findObject(By.text("INSERT")), 10_000))
+        assertNotNull(device.findObject(By.text("Alpha Three")))
         findText("CLOSE").click()
         Thread.sleep(300)
 
