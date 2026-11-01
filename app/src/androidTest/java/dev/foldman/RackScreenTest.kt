@@ -160,6 +160,7 @@ class RackScreenTest {
         find("Album A").longClick()
         Thread.sleep(1000)
         shot("13-card")
+        context.getExternalFilesDir("shots")?.let { device.dumpWindowHierarchy(File(it, "13-card.xml")) }
         assertNotNull("the card did not open", device.wait(Until.findObject(By.text("INSERT")), 10_000))
         assertNotNull(device.findObject(By.text("Alpha Three")))
         findText("CLOSE").click()
