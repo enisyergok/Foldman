@@ -29,6 +29,15 @@ sealed interface SourceStatus {
     data object NeedsAppleSignIn : SourceStatus
 }
 
+/** The tape's character, from the settings sheet; all zero is the clean sound of the file. */
+data class TapeCharacter(
+    val wow: Float = 0f,
+    val hiss: Float = 0f,
+    val warmth: Float = 0f,
+    val bump: Float = 0f,
+    val replayGain: Boolean = false,
+)
+
 /** What the tape shelf knows about the user's Apple Music library (MusicKit sign-in + Apple Music API). */
 data class AppleUi(
     /** MusicKit's auth AAR is in the build, so Foldman can sign in and browse. */
@@ -48,8 +57,15 @@ data class LocalTrack(
     val uri: Uri,
     val title: String,
     val artist: String?,
+    /** The album folder's name, as shown. */
     val folder: String,
     val coverUri: Uri?,
+    /** Where that folder is under the music folder, so two albums with the same name stay apart. */
+    val folderPath: String = folder,
+    val size: Long = 0,
+    val modified: Long = 0,
+    /** The title and artist come from the file's tags (or it has none), not just from its name. */
+    val tagged: Boolean = false,
 )
 
 /** A song in the play queue: a local file (id = index) or another app's queue item. */
@@ -76,6 +92,8 @@ data class BackendState(
     val nowPlaying: NowPlaying = NowPlaying(),
     val isPlaying: Boolean = false,
     val ended: Boolean = false,
+    /** The player is meant to be playing (even if it is momentarily buffering or has just reached the end). */
+    val wantsPlay: Boolean = false,
     val trackIndex: Int = -1,
     val trackCount: Int = 0,
     val hasNext: Boolean = false,

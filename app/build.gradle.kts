@@ -70,6 +70,10 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -96,4 +100,8 @@ dependencies {
     implementation(fileTree("libs") { include("*.aar", "*.jar") })
     // MusicKit's sign-in screen uses an AppCompat theme.
     implementation("androidx.appcompat:appcompat:1.8.0")
+
+    testImplementation("junit:junit:4.13.2")
+    // The real org.json, so tests of code that reads and writes JSON don't get Android's empty stubs.
+    testImplementation("org.json:json:20240303")
 }

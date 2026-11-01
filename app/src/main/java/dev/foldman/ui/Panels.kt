@@ -162,12 +162,13 @@ private fun Albums(ui: DeckUi, actions: ShelfActions) {
         else -> {
             // Each folder is an album: its first track's index, cover and size.
             val albums = remember(ui.tracks) {
-                ui.tracks.withIndex().groupBy { it.value.folder }.map { (folder, items) ->
-                    Triple(folder, items.first(), items.size)
+                ui.tracks.withIndex().groupBy { it.value.folderPath }.map { (path, items) ->
+                    Triple(path to items.first().value.folder, items.first(), items.size)
                 }
             }
             LazyColumn {
-                items(albums, key = { it.first }) { (folder, first, count) ->
+                items(albums, key = { it.first.first }) { (album, first, count) ->
+                    val folder = album.second
                     Row(
                         Modifier
                             .fillMaxWidth()

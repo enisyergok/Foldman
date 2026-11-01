@@ -56,6 +56,7 @@ class AppleKitBackend(private val context: Context) : DeckBackend {
     private var songs: List<String> = emptyList()
     private var songIndex = 0
     private var restoreAfterCrash = false
+    private val waiting = ArrayDeque<Pair<Int, Bundle?>>()
 
     private var artworkUrl: String? = null
     private var artwork: Bitmap? = null
@@ -86,6 +87,7 @@ class AppleKitBackend(private val context: Context) : DeckBackend {
                 })
                 messages.value = "Apple's player stopped unexpectedly and was restarted."
             }
+            sendWaiting()
             publish()
         }
 
@@ -129,6 +131,7 @@ class AppleKitBackend(private val context: Context) : DeckBackend {
     }
 
     private fun unbind() {
+        waiting.clear()
         if (!bound) return
         runCatching { context.unbindService(connection) }
         bound = false
@@ -141,7 +144,11 @@ class AppleKitBackend(private val context: Context) : DeckBackend {
     })
 
     private fun send(what: Int, data: Bundle? = null) {
-        val s = service ?: return
+        val s = service
+        if (s == null) {
+            holdUntilConnected(what, data)
+            return
+        }
         try {
             s.send(Message.obtain(null, what).apply {
                 replyTo = replies
@@ -150,6 +157,22 @@ class AppleKitBackend(private val context: Context) : DeckBackend {
         } catch (_: RemoteException) {
             // The process is gone; onServiceDisconnected handles the restart.
         }
+    }
+
+    /** Commands that arrive before the player's process is up (or while it restarts) wait for it. */
+    private fun holdUntilConnected(what: Int, data: Bundle?) {
+        // These are sent anyway the moment the connection is made.
+        if (what == P.MSG_REGISTER || what == P.MSG_TOKENS) return
+        // A new queue replaces whatever was waiting.
+        if (what == P.MSG_PLAY_SONGS) waiting.clear()
+        if (waiting.size >= MAX_WAITING) waiting.removeFirst()
+        waiting.addLast(what to data?.let { Bundle(it) })
+    }
+
+    private fun sendWaiting() {
+        val items = waiting.toList()
+        waiting.clear()
+        for ((what, data) in items) send(what, data)
     }
 
     private fun onSnapshot(data: Bundle) {
@@ -229,6 +252,10 @@ class AppleKitBackend(private val context: Context) : DeckBackend {
     override fun skipToNext() = send(P.MSG_NEXT)
     override fun skipToPrevious() = send(P.MSG_PREVIOUS)
     override fun playQueueItem(id: Long) = send(P.MSG_SKIP_TO, Bundle().apply { putLong(P.ID, id) })
+
+    private companion object {
+        const val MAX_WAITING = 16
+    }
 
     override fun release() {
         unbind()

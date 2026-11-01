@@ -81,6 +81,7 @@ class WalkmanActions(
     val noiseReduction: (Boolean) -> Unit,
     val monitor: (Boolean) -> Unit,
     val openShelf: () -> Unit,
+    val openSettings: () -> Unit,
 )
 
 // The artwork is 941 x 1672; every coordinate below is in those pixels.
@@ -202,14 +203,15 @@ fun WalkmanPlayer(ui: DeckUi, anim: DeckAnimations, a: WalkmanActions, modifier:
                 Hotspot(ka.x0 - 3f, KEY_TOP, ka.x1 - ka.x0 + 6f, KEY_H, s, ka.id, pressed, keyActions.getValue(ka.id))
             }
 
-            // ---- cassette window: tap for the tape shelf, swipe up/down for next/previous song
+            // ---- cassette window: tap for the tape shelf, hold for the tape settings, swipe up/down for next/previous song
             val openShelf by rememberUpdatedState(a.openShelf)
+            val openSettings by rememberUpdatedState(a.openSettings)
             val next by rememberUpdatedState(a.next)
             val previous by rememberUpdatedState(a.previous)
             Box(
                 Modifier.at(116f, 350f, 545f, 750f, s)
                     .semantics { role = Role.Button; contentDescription = "Tape shelf" }
-                    .pointerInput(Unit) { detectTapGestures(onTap = { openShelf() }) }
+                    .pointerInput(Unit) { detectTapGestures(onTap = { openShelf() }, onLongPress = { openSettings() }) }
                     .pointerInput(Unit) {
                         var dy = 0f
                         detectVerticalDragGestures(
@@ -417,7 +419,7 @@ private val DB_X = floatArrayOf(168f, 248f, 320f, 396f, 473f, 547f, 620f)
 private val DB_V = floatArrayOf(-20f, -10f, -6f, -3f, 0f, 3f, 6f)
 
 /** How many of the 30 lamps a needle value (0 = −20 VU … 1 = +3 VU) lights, following the printed scale. */
-private fun lit(v: Float): Int {
+internal fun lit(v: Float): Int {
     if (v <= 0.004f) return 0
     val vu = -20f + 23f * v.coerceIn(0f, 1.1f)
     var x = DB_X.last()
@@ -496,7 +498,7 @@ private fun DrawScope.drawMonitorSpark() {
     drawRoundRect(Color(0xFFFFE6A0), Offset(853f, 73f), Size(10f, 4f), CornerRadius(2f))
 }
 
-private fun clock(ms: Long): String {
+internal fun clock(ms: Long): String {
     val total = (ms / 1000).coerceAtLeast(0)
     return "%02d:%02d".format(total / 60, total % 60)
 }

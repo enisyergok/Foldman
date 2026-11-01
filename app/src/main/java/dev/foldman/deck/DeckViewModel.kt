@@ -21,7 +21,9 @@ import dev.foldman.apple.AppleMusicApi
 import dev.foldman.apple.ApplePlaylist
 import dev.foldman.apple.MusicKit
 import dev.foldman.playback.LocalBackend
+import dev.foldman.playback.LibraryCache
 import dev.foldman.playback.LocalLibrary
+import dev.foldman.playback.TapeKeys
 import dev.foldman.remote.RemoteBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -66,8 +69,15 @@ data class DeckUi(
     val haptics: Boolean = true,
     /** 0 NORMAL, 1 CrO2, 2 METAL: the tone the tape type gives local playback. */
     val tapeType: Int = 0,
-    /** The NR switch: rolls off the hiss band on local playback. */
+    /** The NR switch: expands the treble away from the hiss, on local playback. */
     val noiseReduction: Boolean = false,
+    val character: TapeCharacter = TapeCharacter(),
+    /** Side B and auto-reverse: at the end of the tape, turn it over and keep playing. */
+    val autoReverse: Boolean = false,
+    /** 0 = side A, 1 = side B. */
+    val side: Int = 0,
+    val sleepMinutes: Int = 0,
+    val sleepRemainingMs: Long = 0,
     /** The MONITOR switch: keeps the screen lit while the tape runs. */
     val monitor: Boolean = true,
     val apple: AppleUi = AppleUi(),
@@ -87,6 +97,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("foldman", Context.MODE_PRIVATE)
     private val audio = app.getSystemService(AudioManager::class.java)
     private val library = LocalLibrary(app)
+    private val libraryCache = LibraryCache(app)
     private val local = LocalBackend(app).also { it.connect() }
     /** In-app Apple Music, when MusicKit's playback AAR is in the build; otherwise the Apple Music app is driven remotely. */
     private val appleKit = if (MusicKit.hasPlayback) AppleKitBackend(app) else null
@@ -120,6 +131,14 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     private var playRequestedAt = 0L
     /** -1 rewinding, +1 fast-forwarding, 0 neither. */
     private var winding = 0
+    /** 0 = side A, 1 = side B (the tape was turned over by auto-reverse). */
+    private var side = 0
+    private var reversedAt = 0L
+    private var sleepMinutes = 0
+    private var sleepDeadline = 0L
+    private var sleepJob: Job? = null
+    /** False while the app is off screen: nothing needs redrawing, so the update loop rests. */
+    private val foreground = MutableStateFlow(true)
     private var windPosition = 0L
     private var windLastTick = 0L
     private var windLastSeek = 0L
@@ -142,10 +161,34 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         backend.refresh()
         viewModelScope.launch {
             while (true) {
+                if (!foreground.value) foreground.first { it }
                 tick()
                 delay(if (winding != 0) 33 else 100)
             }
         }
+        // Auto-reverse has to work with the screen off, so it listens to the player, not to the loop.
+        viewModelScope.launch { local.state.collect { autoReverseIfEnded(it) } }
+    }
+
+    /** The app came to the front or went away; the loop only runs while it is in front. */
+    fun setForeground(on: Boolean) {
+        if (!on && winding != 0) finishWinding()
+        foreground.value = on
+        if (on) tick()
+    }
+
+    /** At the end of the tape, with auto-reverse on: turn it over and play it again. */
+    private fun autoReverseIfEnded(state: BackendState) {
+        if (!state.ended || !state.wantsPlay || source != Source.LOCAL) return
+        if (!prefs.getBoolean(TapeKeys.AUTO_REVERSE, false) || tracks.isEmpty()) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - reversedAt < 2000) return
+        reversedAt = now
+        side = 1 - side
+        stopped = false
+        playRequestedAt = now
+        local.playTrack(0)
+        tick()
     }
 
     // region Keys
@@ -297,23 +340,37 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadFolder(uri: Uri, firstLoad: Boolean) {
         scanJob?.cancel()
         scanJob = viewModelScope.launch {
-            local.setLibraryStatus(SourceStatus.Scanning(0))
+            // What was found last time shows at once; the folder is then checked for changes.
+            val cached = withContext(Dispatchers.IO) { libraryCache.load(uri) }.orEmpty()
+            if (cached.isNotEmpty()) {
+                useTracks(cached, uri, reset = !firstLoad)
+            } else {
+                local.setLibraryStatus(SourceStatus.Scanning(0))
+            }
             val found = runCatching {
-                library.scan(uri) { n -> viewModelScope.launch { local.setLibraryStatus(SourceStatus.Scanning(n)) } }
+                library.scan(uri, previous = cached) { n ->
+                    if (cached.isEmpty()) viewModelScope.launch { local.setLibraryStatus(SourceStatus.Scanning(n)) }
+                }
             }.getOrElse {
-                local.setLibraryStatus(SourceStatus.NeedsFolder)
+                if (it is kotlinx.coroutines.CancellationException) throw it
+                if (cached.isEmpty()) local.setLibraryStatus(SourceStatus.NeedsFolder)
                 return@launch
             }
-            folderName = found.firstOrNull()?.folder ?: uri.lastPathSegment?.substringAfterLast(':')
-            tracks = found
-            local.setTracks(found, startIndex = if (firstLoad) null else 0)
-            if (!firstLoad) stopped = true
-            tick()
+            // Only touch the player when the list really changed (a changed file, a new album…).
+            if (found.map { it.uri } != tracks.map { it.uri }) useTracks(found, uri, reset = cached.isEmpty() && !firstLoad)
             val tagged = library.readTags(found)
-            tracks = tagged
-            local.setTracks(tagged)
-            tick()
+            useTracks(tagged, uri, reset = false)
+            withContext(Dispatchers.IO) { libraryCache.save(uri, tagged) }
         }
+    }
+
+    /** Makes [list] the tape: remembers it, loads it into the player and refreshes the screen. */
+    private fun useTracks(list: List<LocalTrack>, tree: Uri, reset: Boolean) {
+        folderName = list.firstOrNull()?.folderPath?.substringBefore('/') ?: tree.lastPathSegment?.substringAfterLast(':')
+        tracks = list
+        local.setTracks(list, startIndex = if (reset) 0 else null)
+        if (reset) stopped = true
+        tick()
     }
 
     fun refresh() {
@@ -362,13 +419,73 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         tick()
     }
 
+    /** One of the settings sheet's sliders: [key] is a [TapeKeys] name, [value] 0..1. */
+    fun setTapeCharacter(key: String, value: Float) {
+        if (key != TapeKeys.WOW && key != TapeKeys.HISS && key != TapeKeys.WARMTH && key != TapeKeys.BUMP) return
+        prefs.edit { putFloat(key, value.coerceIn(0f, 1f)) }
+        tick()
+    }
+
+    fun resetTapeCharacter() {
+        prefs.edit {
+            putFloat(TapeKeys.WOW, 0f); putFloat(TapeKeys.HISS, 0f)
+            putFloat(TapeKeys.WARMTH, 0f); putFloat(TapeKeys.BUMP, 0f)
+        }
+        tick()
+    }
+
+    fun setReplayGain(on: Boolean) {
+        prefs.edit { putBoolean(TapeKeys.REPLAY_GAIN, on) }
+        tick()
+    }
+
+    fun setAutoReverse(on: Boolean) {
+        prefs.edit { putBoolean(TapeKeys.AUTO_REVERSE, on) }
+        tick()
+    }
+
+    /**
+     * Stops the music after [minutes] (0 turns the timer off). The local tape fades out over the last
+     * 15 seconds; other sources are paused when the time is up.
+     */
+    fun setSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        local.setFade(1f)
+        sleepMinutes = minutes.coerceAtLeast(0)
+        if (sleepMinutes == 0) {
+            sleepDeadline = 0
+            tick()
+            return
+        }
+        val deadline = SystemClock.elapsedRealtime() + sleepMinutes * 60_000L
+        sleepDeadline = deadline
+        sleepJob = viewModelScope.launch {
+            while (true) {
+                val left = deadline - SystemClock.elapsedRealtime()
+                if (left <= 0) break
+                if (left <= SLEEP_FADE_MS && source == Source.LOCAL) local.setFade(left.toFloat() / SLEEP_FADE_MS)
+                delay(if (left <= SLEEP_FADE_MS) 100L else minOf(1000L, left - SLEEP_FADE_MS))
+            }
+            if (winding != 0) finishWinding()
+            backend.pause()
+            stopped = true
+            playRequestedAt = 0
+            // The pause is queued ahead of this, so the volume comes back only once the music has stopped.
+            local.setFade(1f)
+            sleepMinutes = 0
+            sleepDeadline = 0
+            tick()
+        }
+        tick()
+    }
+
     fun setTapeType(type: Int) {
-        prefs.edit { putInt(KEY_TAPE_TYPE, type.coerceIn(0, 2)) }
+        prefs.edit { putInt(TapeKeys.TYPE, type.coerceIn(0, 2)) }
         tick()
     }
 
     fun setNoiseReduction(on: Boolean) {
-        prefs.edit { putBoolean(KEY_NOISE_REDUCTION, on) }
+        prefs.edit { putBoolean(TapeKeys.NOISE_REDUCTION, on) }
         tick()
     }
 
@@ -564,8 +681,19 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             currentQueueId = if (source == Source.LOCAL) state.trackIndex.toLong() else state.currentQueueId,
             keySounds = prefs.getBoolean(KEY_SOUNDS, true),
             haptics = prefs.getBoolean(KEY_HAPTICS, true),
-            tapeType = prefs.getInt(KEY_TAPE_TYPE, 0),
-            noiseReduction = prefs.getBoolean(KEY_NOISE_REDUCTION, false),
+            tapeType = prefs.getInt(TapeKeys.TYPE, 0).coerceIn(0, 2),
+            noiseReduction = prefs.getBoolean(TapeKeys.NOISE_REDUCTION, false),
+            character = TapeCharacter(
+                wow = prefs.getFloat(TapeKeys.WOW, 0f),
+                hiss = prefs.getFloat(TapeKeys.HISS, 0f),
+                warmth = prefs.getFloat(TapeKeys.WARMTH, 0f),
+                bump = prefs.getFloat(TapeKeys.BUMP, 0f),
+                replayGain = prefs.getBoolean(TapeKeys.REPLAY_GAIN, false),
+            ),
+            autoReverse = prefs.getBoolean(TapeKeys.AUTO_REVERSE, false),
+            side = side,
+            sleepMinutes = sleepMinutes,
+            sleepRemainingMs = if (sleepDeadline > 0) (sleepDeadline - now).coerceAtLeast(0) else 0L,
             monitor = prefs.getBoolean(KEY_MONITOR, true),
             apple = apple.value,
         )
@@ -612,13 +740,12 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         private const val KEY_FOLDER = "folder"
         private const val KEY_SOUNDS = "key_sounds"
         private const val KEY_HAPTICS = "haptics"
-        const val KEY_TAPE_TYPE = "tape_type"
-        const val KEY_NOISE_REDUCTION = "noise_reduction"
         private const val KEY_MONITOR = "monitor"
         private const val KEY_APPLE_DEV = "apple_developer_token"
         private const val KEY_APPLE_USER = "apple_music_user_token"
         /** Winding speed relative to play: a four-minute song winds through in about 20 s. */
         const val WIND_SPEED = 12L
+        private const val SLEEP_FADE_MS = 15_000L
 
         private fun blend(a: Color, b: Color, t: Float) = Color(
             red = a.red * (1 - t) + b.red * t,

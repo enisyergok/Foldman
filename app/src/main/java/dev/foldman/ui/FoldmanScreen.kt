@@ -4,6 +4,7 @@ import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -90,6 +92,7 @@ fun FoldmanScreen(
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     var shelfOpen by rememberSaveable { mutableStateOf(false) }
+    var tapeSheetOpen by rememberSaveable { mutableStateOf(false) }
     val feel by rememberUpdatedState(ui)
 
     // A new tape drops into the deck whenever the source changes (and when the app opens).
@@ -143,7 +146,13 @@ fun FoldmanScreen(
             play = vm::play, pause = vm::pauseKey, stop = vm::stop, rewind = vm::rewind, fastForward = vm::fastForward,
             next = vm::next, previous = vm::previous, volume = vm::setVolume, seek = vm::seekToFraction,
             tapeType = vm::setTapeType, noiseReduction = vm::setNoiseReduction, monitor = vm::setMonitor,
-            openShelf = { shelfOpen = true },
+            openShelf = { shelfOpen = true }, openSettings = { tapeSheetOpen = true },
+        )
+    }
+    val tapeActions = remember(vm) {
+        TapeSheetActions(
+            character = vm::setTapeCharacter, reset = vm::resetTapeCharacter, replayGain = vm::setReplayGain,
+            autoReverse = vm::setAutoReverse, sleep = vm::setSleepTimer,
         )
     }
     val fold = windowLayout?.displayFeatures?.filterIsInstance<FoldingFeature>()?.firstOrNull()
@@ -176,7 +185,7 @@ fun FoldmanScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     LibraryBand(ui, shelfActions, vm::playQueueItem, Modifier.fillMaxWidth().weight(if (landscape) 0.31f else 0.27f))
-                    DeckBand(ui, anim, deck, vm, Modifier.fillMaxWidth().weight(if (landscape) 0.44f else 0.46f))
+                    DeckBand(ui, anim, deck, vm, Modifier.fillMaxWidth().weight(if (landscape) 0.44f else 0.46f).holdForTapeSettings { tapeSheetOpen = true })
                     NowPlayingBand(ui, vm::playQueueItem, Modifier.fillMaxWidth().weight(if (landscape) 0.25f else 0.27f))
                 }
                 Posture.Tabletop -> {
@@ -190,7 +199,8 @@ fun FoldmanScreen(
                                 .height(topH)
                                 .fillMaxWidth()
                                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
+                                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)
+                                .holdForTapeSettings { tapeSheetOpen = true },
                         )
                         Spacer(Modifier.height(gap))
                         LibraryBand(
@@ -225,9 +235,22 @@ fun FoldmanScreen(
                     )
                 }
             }
+            if (tapeSheetOpen) {
+                ModalBottomSheet(
+                    onDismissRequest = { tapeSheetOpen = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    containerColor = Color(0xFF1C1510),
+                ) {
+                    TapeSheet(ui, tapeActions, Modifier.fillMaxWidth().height(sheetHeight))
+                }
+            }
         }
     }
 }
+
+/** Pressing and holding the deck opens the tape settings (the folded player does it on its cassette). */
+private fun Modifier.holdForTapeSettings(open: () -> Unit): Modifier =
+    pointerInput(Unit) { detectTapGestures(onLongPress = { open() }) }
 
 /** Hides the status and navigation bars (a swipe from the edge brings them back briefly), or restores them. */
 private fun android.view.View.showSystemBars(show: Boolean) {

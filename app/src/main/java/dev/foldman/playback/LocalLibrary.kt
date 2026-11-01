@@ -6,48 +6,86 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import dev.foldman.deck.LocalTrack
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.coroutineContext
 
 /** Walks a folder picked with the system file picker and finds the music (and cover art) in it. */
 class LocalLibrary(private val context: Context) {
 
-    /** Every audio file under [tree], album folders in order, tracks in natural order within them. */
-    suspend fun scan(tree: Uri, onProgress: (Int) -> Unit = {}): List<LocalTrack> = withContext(Dispatchers.IO) {
+    /**
+     * Every audio file under [tree], album folders in order, tracks in natural order within them.
+     * Files that are unchanged since [previous] keep the tags found then.
+     */
+    suspend fun scan(
+        tree: Uri,
+        previous: List<LocalTrack> = emptyList(),
+        onProgress: (Int) -> Unit = {},
+    ): List<LocalTrack> = withContext(Dispatchers.IO) {
+        val known = previous.associateBy { it.uri.toString() }
         val found = mutableListOf<LocalTrack>()
         val rootId = DocumentsContract.getTreeDocumentId(tree)
-        walk(tree, rootId, displayName(tree, rootId) ?: "Music", found, onProgress)
-        found.sortedWith(compareBy<LocalTrack, String>(NaturalOrder) { it.folder }.thenBy(NaturalOrder) { it.uri.lastPathSegment ?: "" })
+        val rootName = displayName(tree, rootId) ?: "Music"
+        walk(tree, rootId, rootName, rootName, known, found, onProgress)
+        found.sortedWith(compareBy<LocalTrack, String>(NaturalOrder) { it.folderPath }.thenBy(NaturalOrder) { it.uri.lastPathSegment ?: "" })
     }
 
-    /** Fills in tag titles and artists, which file names only approximate. Slow, so it runs after the scan. */
-    suspend fun readTags(tracks: List<LocalTrack>, limit: Int = 600): List<LocalTrack> = withContext(Dispatchers.IO) {
-        val retriever = MediaMetadataRetriever()
-        try {
-            tracks.mapIndexed { i, track ->
-                coroutineContext.ensureActive()
-                if (i >= limit) return@mapIndexed track
-                runCatching {
-                    retriever.setDataSource(context, track.uri)
-                    val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                    val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                    track.copy(
-                        title = title?.takeIf { it.isNotBlank() } ?: track.title,
-                        artist = artist?.takeIf { it.isNotBlank() } ?: track.artist,
-                    )
-                }.getOrDefault(track)
+    /**
+     * Fills in tag titles and artists, which file names only approximate, for every file that has not
+     * been read yet. Three files are read at a time; [onProgress] gets (done, total).
+     */
+    suspend fun readTags(tracks: List<LocalTrack>, onProgress: (Int, Int) -> Unit = { _, _ -> }): List<LocalTrack> = coroutineScope {
+        val pending = tracks.indices.filter { !tracks[it].tagged }
+        if (pending.isEmpty()) return@coroutineScope tracks
+        val result = arrayOfNulls<LocalTrack>(tracks.size)
+        val done = AtomicInteger(0)
+        val gate = Semaphore(3)
+        pending.chunked(32).map { chunk ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        for (i in chunk) {
+                            ensureActive()
+                            result[i] = readOne(retriever, tracks[i])
+                            onProgress(done.incrementAndGet(), pending.size)
+                        }
+                    } finally {
+                        retriever.release()
+                    }
+                }
             }
-        } finally {
-            retriever.release()
-        }
+        }.awaitAll()
+        List(tracks.size) { result[it] ?: tracks[it] }
     }
 
-    private suspend fun walk(tree: Uri, docId: String, folder: String, out: MutableList<LocalTrack>, onProgress: (Int) -> Unit) {
+    private fun readOne(retriever: MediaMetadataRetriever, track: LocalTrack): LocalTrack = runCatching {
+        retriever.setDataSource(context, track.uri)
+        val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+        val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+        track.copy(
+            title = title?.takeIf { it.isNotBlank() } ?: track.title,
+            artist = artist?.takeIf { it.isNotBlank() } ?: track.artist,
+            tagged = true,
+        )
+        // A file that can't be read is marked done too, so it isn't tried again until it changes.
+    }.getOrDefault(track.copy(tagged = true))
+
+    private suspend fun walk(
+        tree: Uri, docId: String, folder: String, path: String, known: Map<String, LocalTrack>,
+        out: MutableList<LocalTrack>, onProgress: (Int) -> Unit,
+    ) {
         coroutineContext.ensureActive()
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, docId)
         val dirs = mutableListOf<Pair<String, String>>()
-        val audio = mutableListOf<Pair<String, String>>()
+        val audio = mutableListOf<Triple<String, String, Pair<Long, Long>>>()
         var cover: Uri? = null
         context.contentResolver.query(
             children,
@@ -55,6 +93,8 @@ class LocalLibrary(private val context: Context) {
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                 DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED,
             ),
             null, null, null,
         )?.use { c ->
@@ -65,23 +105,27 @@ class LocalLibrary(private val context: Context) {
                 val ext = name.substringAfterLast('.', "").lowercase()
                 when {
                     mime == DocumentsContract.Document.MIME_TYPE_DIR -> if (!name.startsWith(".")) dirs += id to name
-                    mime.startsWith("audio/") || ext in AUDIO_EXTENSIONS -> audio += id to name
+                    mime.startsWith("audio/") || ext in AUDIO_EXTENSIONS -> audio += Triple(id, name, c.getLong(3) to c.getLong(4))
                     mime.startsWith("image/") && name.substringBeforeLast('.').lowercase() in COVER_NAMES ->
                         cover = DocumentsContract.buildDocumentUriUsingTree(tree, id)
                 }
             }
         }
-        for ((id, name) in audio) {
-            out += LocalTrack(
-                uri = DocumentsContract.buildDocumentUriUsingTree(tree, id),
-                title = titleFromFileName(name),
-                artist = null,
-                folder = folder,
-                coverUri = cover,
-            )
+        for ((id, name, stamp) in audio) {
+            val uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
+            val old = known[uri.toString()]
+            out += if (old != null && old.tagged && old.size == stamp.first && old.modified == stamp.second) {
+                // Unchanged: keep its tags, but take the folder and cover as they are now.
+                old.copy(folder = folder, folderPath = path, coverUri = cover)
+            } else {
+                LocalTrack(
+                    uri = uri, title = titleFromFileName(name), artist = null, folder = folder, coverUri = cover,
+                    folderPath = path, size = stamp.first, modified = stamp.second, tagged = false,
+                )
+            }
         }
         if (audio.isNotEmpty()) onProgress(out.size)
-        for ((id, name) in dirs) walk(tree, id, name, out, onProgress)
+        for ((id, name) in dirs) walk(tree, id, name, "$path/$name", known, out, onProgress)
     }
 
     private fun displayName(tree: Uri, docId: String): String? = runCatching {
@@ -94,31 +138,8 @@ class LocalLibrary(private val context: Context) {
     companion object {
         private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "flac", "ogg", "opus", "wav", "wma", "alac", "aiff", "aif", "mka")
         private val COVER_NAMES = setOf("cover", "folder", "front", "album", "albumart", "albumartsmall")
-        private val TRACK_NUMBER = Regex("""^\s*(\d{1,3}|[A-D]\d{1,2})\s*[-._)\s]\s*""")
 
         /** "03 - Blue Monday.flac" → "Blue Monday". */
-        fun titleFromFileName(name: String): String {
-            val stem = name.substringBeforeLast('.')
-            return stem.replace(TRACK_NUMBER, "").replace('_', ' ').trim().ifEmpty { stem }
-        }
-    }
-}
-
-/** Orders "2 …" before "10 …", as people number their files. */
-private object NaturalOrder : Comparator<String> {
-    private val chunks = Regex("""\d+|\D+""")
-    override fun compare(a: String, b: String): Int {
-        val x = chunks.findAll(a.lowercase()).map { it.value }.toList()
-        val y = chunks.findAll(b.lowercase()).map { it.value }.toList()
-        for (i in 0 until minOf(x.size, y.size)) {
-            val p = x[i]
-            val q = y[i]
-            val cmp = if (p[0].isDigit() && q[0].isDigit()) {
-                p.trimStart('0').length.compareTo(q.trimStart('0').length).takeIf { it != 0 }
-                    ?: p.trimStart('0').compareTo(q.trimStart('0'))
-            } else p.compareTo(q)
-            if (cmp != 0) return cmp
-        }
-        return x.size.compareTo(y.size)
+        fun titleFromFileName(name: String): String = FileNames.title(name)
     }
 }

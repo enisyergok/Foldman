@@ -40,6 +40,10 @@ class MainActivity : ComponentActivity() {
             val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
                 if (uri != null) {
                     contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    // Android caps how many folder permissions an app may hold; keep only this one.
+                    contentResolver.persistedUriPermissions.filter { it.uri != uri }.forEach {
+                        runCatching { contentResolver.releasePersistableUriPermission(it.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                    }
                     vm.setFolder(uri)
                 }
             }
@@ -82,6 +86,16 @@ class MainActivity : ComponentActivity() {
             ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         if (requestedOrientation != wanted) requestedOrientation = wanted
+    }
+
+    override fun onStart() {
+        super.onStart()
+        vm.setForeground(true)
+    }
+
+    override fun onStop() {
+        vm.setForeground(false)
+        super.onStop()
     }
 
     override fun onResume() {

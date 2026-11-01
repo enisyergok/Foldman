@@ -84,21 +84,44 @@ class LocalBackend(private val context: Context) : DeckBackend {
         tracks = newTracks
         libraryStatus = if (newTracks.isEmpty()) SourceStatus.EmptyFolder else SourceStatus.Ready
         withController { c ->
-            val sameQueue = c.mediaItemCount == newTracks.size &&
-                newTracks.isNotEmpty() &&
-                c.getMediaItemAt(0).mediaId == newTracks[0].uri.toString()
+            val sameQueue = c.mediaItemCount == newTracks.size && newTracks.isNotEmpty() &&
+                (0 until c.mediaItemCount).all { c.getMediaItemAt(it).mediaId == newTracks[it].uri.toString() }
             if (!sameQueue || startIndex != null) {
                 c.setMediaItems(newTracks.map(::toMediaItem), startIndex ?: 0, 0L)
                 c.prepare()
             } else {
-                // Refresh titles from tags without disturbing playback.
-                newTracks.forEachIndexed { i, t ->
-                    if (i < c.mediaItemCount && i != c.currentMediaItemIndex) c.replaceMediaItem(i, toMediaItem(t))
-                }
+                refreshTitles(c, newTracks)
             }
             publish()
         }
         publish()
+    }
+
+    /**
+     * Brings the player's own copies of the titles up to date with the tags, a block at a time (one
+     * message per item would take seconds for a big library) and never touching the song that is playing.
+     */
+    private fun refreshTitles(c: MediaController, newTracks: List<LocalTrack>) {
+        val current = c.currentMediaItemIndex
+        var from = 0
+        while (from < newTracks.size) {
+            val to = minOf(from + REPLACE_BLOCK, newTracks.size)
+            val stale = (from until to).any { i ->
+                i != current && c.getMediaItemAt(i).mediaMetadata.let {
+                    it.title?.toString() != newTracks[i].title || it.artist?.toString() != newTracks[i].artist
+                }
+            }
+            if (stale) {
+                // The playing song splits the block in two, so it is left exactly as it is.
+                if (current in from until to) {
+                    if (current > from) c.replaceMediaItems(from, current, newTracks.subList(from, current).map(::toMediaItem))
+                    if (current + 1 < to) c.replaceMediaItems(current + 1, to, newTracks.subList(current + 1, to).map(::toMediaItem))
+                } else {
+                    c.replaceMediaItems(from, to, newTracks.subList(from, to).map(::toMediaItem))
+                }
+            }
+            from = to
+        }
     }
 
     fun playTrack(index: Int) = withController { c ->
@@ -106,6 +129,10 @@ class LocalBackend(private val context: Context) : DeckBackend {
         c.seekTo(index, 0L)
         c.prepare()
         c.play()
+    }
+
+    private companion object {
+        const val REPLACE_BLOCK = 200
     }
 
     private fun toMediaItem(t: LocalTrack) = MediaItem.Builder()
@@ -140,6 +167,7 @@ class LocalBackend(private val context: Context) : DeckBackend {
             ),
             isPlaying = c.isPlaying || (c.playWhenReady && c.playbackState == Player.STATE_BUFFERING),
             ended = c.playbackState == Player.STATE_ENDED,
+            wantsPlay = c.playWhenReady,
             trackIndex = index,
             trackCount = c.mediaItemCount,
             hasNext = c.hasNextMediaItem(),
@@ -175,6 +203,11 @@ class LocalBackend(private val context: Context) : DeckBackend {
         c.play()
     }
     override fun pause() { controller?.pause() }
+
+    /** Scales the volume of the player itself (not the phone's), for the sleep timer's fade-out. */
+    fun setFade(level: Float) {
+        controller?.volume = level.coerceIn(0f, 1f)
+    }
     override fun seekTo(positionMs: Long) { controller?.seekTo(positionMs) }
     override fun playQueueItem(id: Long) = playTrack(id.toInt())
     override fun skipToNext() { controller?.takeIf { it.hasNextMediaItem() }?.seekToNextMediaItem() }
