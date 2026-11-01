@@ -14,7 +14,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -88,14 +87,22 @@ class RackScreenTest {
     private fun has(text: String) = compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
 
     /** Carries the tape whose card is described by [desc] to the middle of the cassette window by its cover. */
-    private fun carryToDeck(desc: String) {
+    private fun carryToDeck(desc: String, picture: String? = null) {
         val deck = cassette().fetchSemanticsNode().boundsInRoot
         val card = compose.onNode(hasContentDescription(desc, substring = true))
         val cardBounds = card.fetchSemanticsNode().boundsInRoot
         card.performTouchInput {
             val start = Offset(40.dp.toPx(), height / 2f)
             val end = Offset(deck.center.x - cardBounds.left, deck.center.y - cardBounds.top)
-            swipe(start, end, durationMillis = 500)
+            down(start)
+            // carry it in steps; the panel steps aside as soon as it is picked up
+            for (i in 1..20) {
+                moveTo(start + (end - start) * (i / 20f))
+                advanceEventTime(25)
+            }
+            if (picture != null) shot(picture)
+            advanceEventTime(100)
+            up()
         }
     }
 
@@ -126,7 +133,7 @@ class RackScreenTest {
         shot("10-rack-albums")
 
         // carry Album B into the deck by its cover
-        carryToDeck("Album B. ")
+        carryToDeck("Album B. ", picture = "10b-carrying")
         waitFor("Album B in the deck") { vm.ui.value.tape.id == "album:Music/Album B" }
         waitFor("its songs as the queue") { vm.ui.value.queue.size == 2 }
         assertEquals("a tape is put in, not played", Transport.STOPPED, vm.ui.value.transport)
