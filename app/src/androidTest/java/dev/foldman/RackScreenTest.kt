@@ -177,7 +177,7 @@ class RackScreenTest {
         shot("14-rack-mixtapes")
         compose.onNodeWithContentDescription("Blank mixtape").performClick()
         compose.waitUntil(10_000) { has("NEW MIXTAPE") }
-        compose.onAllNodes(hasSetTextAction())[0].performTextInput("Road trip")
+        compose.onAllNodes(hasSetTextAction())[1].performTextInput("Road trip") // [0] is the rack search behind the editor; [1] is its name
         compose.onNode(hasContentDescription("Beta Two, add to the tape")).performClick()
         compose.onNode(hasContentDescription("Alpha One, add to the tape")).performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("ON THIS TAPE · 2", substring = true)).fetchSemanticsNodes().isNotEmpty() }
