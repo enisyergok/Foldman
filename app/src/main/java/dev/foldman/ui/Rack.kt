@@ -67,7 +67,9 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -163,7 +165,11 @@ fun CassetteRack(
     val scrim by animateFloatAsState(if (carrying) 0.10f else 0.55f, label = "scrim")
     val lift by animateFloatAsState(if (carrying) 1f else 0f, label = "lift")
 
-    Box(modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
+    Box(
+        modifier.fillMaxSize()
+            .onGloballyPositioned { origin = it.positionInRoot() }
+            .semantics { paneTitle = "Cassette rack" },
+    ) {
         Box(
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim))
                 .pointerInput(Unit) { detectTapGestures { onClose() } },
@@ -548,7 +554,10 @@ private fun TapeCardSheet(
 ) {
     var choosing by remember { mutableStateOf(false) }
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).pointerInput(Unit) { detectTapGestures { onClose() } },
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
+            .pointerInput(Unit) { detectTapGestures { onClose() } }
+            // a new pane: screen readers announce it and read it first
+            .semantics { paneTitle = "Card of ${tape.title}"; isTraversalGroup = true },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -559,8 +568,7 @@ private fun TapeCardSheet(
                 .clip(RoundedCornerShape(6.dp))
                 .background(DeckColors.Paper)
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(16.dp)
-                .semantics { contentDescription = "Card of ${tape.title}" },
+                .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 CoverThumb(tape.songs.firstOrNull()?.coverUri, Modifier.size(104.dp))
@@ -672,6 +680,7 @@ private fun MixtapeEditor(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(Color(0xFF2A1F17), Color(0xFF1C1510))))
             .pointerInput(Unit) { detectTapGestures { } }
+            .semantics { paneTitle = "Mixtape editor"; isTraversalGroup = true }
             .padding(14.dp),
     ) {
         Text(if (state.mixtapeId == null) "NEW MIXTAPE" else "EDIT MIXTAPE", style = EngravedCaps.copy(color = RackOrange, fontSize = 11.sp, letterSpacing = 3.sp))
