@@ -140,6 +140,8 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
     private var stopped = true
     /** Play was just pressed; keep the play key down while the player catches up. */
     private var playRequestedAt = 0L
+    /** When STOP was last pressed. */
+    private var stopRequestedAt = 0L
     /** -1 rewinding, +1 fast-forwarding, 0 neither. */
     private var winding = 0
     /** 0 = side A, 1 = side B (the tape was turned over by auto-reverse). */
@@ -239,6 +241,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             else -> backend.pause()
         }
         stopped = true
+        stopRequestedAt = SystemClock.elapsedRealtime()
         playRequestedAt = 0
         tick()
     }
@@ -742,7 +745,9 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         val now = SystemClock.elapsedRealtime()
         if (winding != 0) windStep(state)
         if (state.ended) stopped = true
-        if (state.isPlaying && winding == 0) {
+        // Right after STOP the player may still say it is playing for a moment; that is not a PLAY.
+        val justStopped = stopped && now - stopRequestedAt < STOP_SETTLE_MS
+        if (state.isPlaying && winding == 0 && !justStopped) {
             stopped = false
             playRequestedAt = 0
         }
@@ -750,6 +755,7 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         val transport = when {
             winding < 0 -> Transport.REWINDING
             winding > 0 -> Transport.FAST_FORWARDING
+            justStopped -> Transport.STOPPED
             state.isPlaying || playPending -> Transport.PLAYING
             stopped -> Transport.STOPPED
             else -> Transport.PAUSED
@@ -850,6 +856,8 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         /** Winding speed relative to play: a four-minute song winds through in about 20 s. */
         const val WIND_SPEED = 12L
         private const val SLEEP_FADE_MS = 15_000L
+        /** How long after STOP the player's last "still playing" is ignored. */
+        private const val STOP_SETTLE_MS = 700L
 
         private fun blend(a: Color, b: Color, t: Float) = Color(
             red = a.red * (1 - t) + b.red * t,
