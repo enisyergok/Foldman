@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
@@ -89,21 +90,21 @@ class RackScreenTest {
     /** Carries the tape whose card is described by [desc] to the middle of the cassette window by its cover. */
     private fun carryToDeck(desc: String, picture: String? = null) {
         val deck = cassette().fetchSemanticsNode().boundsInRoot
-        val card = compose.onNode(hasContentDescription(desc, substring = true))
-        val cardBounds = card.fetchSemanticsNode().boundsInRoot
-        card.performTouchInput {
-            val start = Offset(40.dp.toPx(), height / 2f)
-            val end = Offset(deck.center.x - cardBounds.left, deck.center.y - cardBounds.top)
-            down(start)
-            // carry it in steps; the panel steps aside as soon as it is picked up
-            for (i in 1..20) {
-                moveTo(start + (end - start) * (i / 20f))
-                advanceEventTime(25)
-            }
-            if (picture != null) shot(picture)
-            advanceEventTime(100)
-            up()
+        val card = compose.onNode(hasContentDescription(desc, substring = true)).fetchSemanticsNode().boundsInRoot
+        val density = context.resources.displayMetrics.density
+        val start = Offset(card.left + 40 * density, card.center.y)
+        val end = deck.center
+        val root = compose.onRoot()
+        // like a finger: each step is its own injection, with the UI given time to react in between
+        root.performTouchInput { down(start) }
+        compose.waitForIdle()
+        for (i in 1..20) {
+            root.performTouchInput { moveTo(start + (end - start) * (i / 20f)) }
+            compose.waitForIdle()
         }
+        if (picture != null) shot(picture)
+        root.performTouchInput { up() }
+        compose.waitForIdle()
     }
 
     private fun stopAndWaitUntilStill() {
