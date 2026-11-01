@@ -233,11 +233,11 @@ fun CassetteRack(
                                     onInsert = { actions.insert(tape); onClose() },
                                     onHold = { card = tape },
                                     onHoldEnd = { card = null },
-                                    onDragStart = { rootPos -> android.util.Log.d("FoldmanRack", "carry start at $rootPos origin=$origin"); card = null; carry = Carry(tape, rootPos - origin) },
+                                    onDragStart = { rootPos -> android.util.Log.d("FoldmanRack", "foldman rack: carry start at $rootPos origin=$origin"); card = null; carry = Carry(tape, rootPos - origin) },
                                     onDrag = { rootPos -> carry = Carry(tape, rootPos - origin) },
                                     onDragEnd = { rootPos ->
                                         val dropped = carry
-                                        android.util.Log.d("FoldmanRack", "carry end at $rootPos origin=$origin deck=$deckBounds carried=${dropped?.tape?.id}")
+                                        android.util.Log.d("FoldmanRack", "foldman rack: carry end at $rootPos origin=$origin deck=$deckBounds carried=${dropped?.tape?.id}")
                                         carry = null
                                         if (rootPos != null && dropped != null && deckBounds.translate(-origin).contains(rootPos - origin)) {
                                             actions.insert(dropped.tape)
@@ -428,7 +428,9 @@ private fun TapeCard(
                     val down = awaitFirstDown()
                     val slop = viewConfiguration.touchSlop
                     fun onScreen(p: Offset): Offset = layout?.takeIf { it.isAttached }?.localToRoot(p) ?: p
+                    android.util.Log.d("FoldmanRack", "foldman rack: down at ${down.position}")
                     val held = awaitLongPressOrCancellation(down.id)
+                    android.util.Log.d("FoldmanRack", "foldman rack: long press=${held != null}")
                     if (held != null) {
                         // Held still: the card opens. If the finger then moves, the tape is picked up instead.
                         hold()
@@ -456,6 +458,7 @@ private fun TapeCard(
                         insert()
                         return@awaitEachGesture
                     }
+                    android.util.Log.d("FoldmanRack", "foldman rack: after slop now=${now.position} consumed=${now.isConsumed}")
                     if (now.isConsumed) return@awaitEachGesture
                     val dx = now.position.x - down.position.x
                     val dy = now.position.y - down.position.y

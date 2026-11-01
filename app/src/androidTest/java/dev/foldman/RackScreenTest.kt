@@ -103,7 +103,7 @@ class RackScreenTest {
         val end = deck.center
         // a real finger: system-level touch events, as the first passing run used
         val device = androidx.test.uiautomator.UiDevice.getInstance(instrumentation)
-        android.util.Log.d("FoldmanRack", "test drag $start -> $end card=$card deck=$deck")
+        android.util.Log.d("FoldmanRack", "foldman rack: test drag $start -> $end card=$card deck=$deck")
         if (picture != null) {
             Thread { Thread.sleep(700); shotNow(picture) }.start()
         }
