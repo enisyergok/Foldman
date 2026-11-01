@@ -138,6 +138,14 @@ fun FoldmanScreen(
         )
     }
     val deck = remember(vm) { DeckControls(vm) }
+    val walkman = remember(vm) {
+        WalkmanActions(
+            play = vm::play, pause = vm::pauseKey, stop = vm::stop, rewind = vm::rewind, fastForward = vm::fastForward,
+            next = vm::next, previous = vm::previous, volume = vm::setVolume, seek = vm::seekToFraction,
+            tapeType = vm::setTapeType, noiseReduction = vm::setNoiseReduction, monitor = vm::setMonitor,
+            openShelf = { shelfOpen = true },
+        )
+    }
     val fold = windowLayout?.displayFeatures?.filterIsInstance<FoldingFeature>()?.firstOrNull()
 
     CompositionLocalProvider(
@@ -162,7 +170,7 @@ fun FoldmanScreen(
             LaunchedEffect(posture) { view.showSystemBars(posture != Posture.Cover) }
             when (posture) {
                 // The cover screen is the player itself: edge to edge, system bars hidden.
-                Posture.Cover -> CoverWalkman(ui, anim, deck, onTapes = { shelfOpen = true }, modifier = Modifier.fillMaxSize())
+                Posture.Cover -> WalkmanPlayer(ui, anim, walkman, Modifier.fillMaxSize())
                 Posture.Unfolded -> Column(
                     Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -250,85 +258,6 @@ private class DeckControls(vm: DeckViewModel) {
 
 private val Serif = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Black, color = Color(0xFFF1F3F6), letterSpacing = 2.sp)
 private val OnEnamel = EngravedCaps.copy(color = Color(0xFFDCE6F2))
-
-/** The folded phone: an upright portable player. */
-@Composable
-private fun CoverWalkman(ui: DeckUi, anim: DeckAnimations, deck: DeckControls, onTapes: () -> Unit, modifier: Modifier) {
-    BoxWithConstraints(modifier) {
-        val capH = maxHeight * 0.12f
-        Row(Modifier.fillMaxSize().paintedBody(Enamel, capHeight = capH, corner = 0.dp, framed = false)) {
-            Column(
-                Modifier
-                    .weight(0.73f)
-                    .fillMaxHeight()
-                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top + WindowInsetsSides.Start))
-                    .padding(start = 20.dp, end = 14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(Modifier.fillMaxWidth().height(capH)) {
-                    // Inset from the corner so the display's rounded corner doesn't clip it.
-                    HotlineButton(onTapes, Modifier.align(Alignment.TopStart).padding(top = 22.dp, start = 8.dp).size(44.dp, 22.dp))
-                    Text("TAPES", style = OnEnamel.copy(fontSize = 7.sp), modifier = Modifier.align(Alignment.TopStart).padding(top = 48.dp, start = 14.dp))
-                }
-                Spacer(Modifier.height(18.dp))
-                Text("STEREO", style = Serif.copy(fontSize = 30.sp))
-                Spacer(Modifier.height(18.dp))
-                Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                        TapeWindow(ui, anim, vertical = true)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    EjectArrow(onTapes, Modifier.size(30.dp, 58.dp))
-                }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    listOf(ui.title, ui.artist).filter { it.isNotBlank() }.joinToString("  —  ").ifBlank { "NO TAPE" }.uppercase(),
-                    style = OnEnamel.copy(fontSize = 9.sp, letterSpacing = 1.5.sp),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(10.dp))
-                Wordmark("FOLDMAN", 40.sp)
-                Spacer(Modifier.height(20.dp))
-            }
-            SideStrip(ui, deck, Modifier.weight(0.27f).fillMaxHeight())
-        }
-    }
-}
-
-/** The silver strip down the side of the case: mic, LED, skip, keys, volume, phones. */
-@Composable
-private fun SideStrip(ui: DeckUi, deck: DeckControls, modifier: Modifier) {
-    BoxWithConstraints(modifier) {
-        val keyH = ((maxHeight - 400.dp) / 5 - 18.dp).coerceIn(34.dp, 64.dp)
-        // Runs the full height of the screen; the padding keeps controls clear of the rounded corners.
-        Column(
-            Modifier
-                .fillMaxSize()
-                .chassis(corner = 0.dp, screws = false)
-                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Top + WindowInsetsSides.End))
-                .padding(start = 10.dp, end = 12.dp, top = 28.dp, bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            MicGrille(Modifier.fillMaxWidth().height(26.dp))
-            Text("MIC", style = EngravedCaps.copy(fontSize = 7.sp))
-            Spacer(Modifier.height(8.dp))
-            StatusLed(ui.transport)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
-                MiniButton("AMS", deck.previous, symbol = KeySymbol.PREV, diameter = 26.dp)
-                MiniButton("AMS", deck.next, symbol = KeySymbol.NEXT, diameter = 26.dp, enabled = ui.hasNext)
-            }
-            Spacer(Modifier.height(10.dp))
-            TransportKeys(ui, deck.stop, deck.rewind, deck.play, deck.fastForward, deck.pause, Modifier.fillMaxWidth(), keyHeight = keyH, vertical = true)
-            Spacer(Modifier.height(12.dp))
-            Text("VOLUME", style = EngravedCaps.copy(fontSize = 7.sp))
-            VolumeSlider(ui.volume, deck.volume, Modifier.fillMaxWidth().weight(1f))
-            Spacer(Modifier.height(8.dp))
-            PhonesJack(Modifier.size(18.dp))
-            Text("PHONES", style = EngravedCaps.copy(fontSize = 6.sp))
-        }
-    }
-}
 
 /** The unfolded phone: the player laid down as a deck. */
 @Composable

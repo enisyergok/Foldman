@@ -129,7 +129,7 @@ fun StatusLed(transport: Transport, modifier: Modifier = Modifier, caption: Stri
 }
 
 @Stable
-private class Needles {
+internal class Needles {
     var left by mutableFloatStateOf(0f)
     var right by mutableFloatStateOf(0f)
     var vl = 0f
@@ -137,16 +137,14 @@ private class Needles {
 }
 
 /**
- * A dual-needle VU meter. On the local tape it reads the decoded audio; other apps' audio isn't
- * readable, so for them it dances to a plausible programme-level signal. Needles are a damped
- * spring, so they swing and settle like the real thing.
+ * The VU engine: damped needles that read the decoded audio on the local tape and dance to a
+ * plausible programme level for other apps' audio. Left and right are 0..1.08 (−20 VU … +3 VU).
  */
 @Composable
-fun VuMeter(transport: Transport, source: Source, modifier: Modifier = Modifier, channel: Int? = null) {
+internal fun rememberNeedles(transport: Transport, source: Source): Needles {
     val needles = remember { Needles() }
     val active by rememberUpdatedState(transport == Transport.PLAYING)
     val isLocal by rememberUpdatedState(source == Source.LOCAL)
-    val measurer = rememberTextMeasurer()
     LaunchedEffect(needles) {
         var last = 0L
         var t = 0f
@@ -183,6 +181,18 @@ fun VuMeter(transport: Transport, source: Source, modifier: Modifier = Modifier,
             }
         }
     }
+    return needles
+}
+
+/**
+ * A dual-needle VU meter. On the local tape it reads the decoded audio; other apps' audio isn't
+ * readable, so for them it dances to a plausible programme-level signal. Needles are a damped
+ * spring, so they swing and settle like the real thing.
+ */
+@Composable
+fun VuMeter(transport: Transport, source: Source, modifier: Modifier = Modifier, channel: Int? = null) {
+    val needles = rememberNeedles(transport, source)
+    val measurer = rememberTextMeasurer()
     Canvas(modifier) {
         val w = size.width
         val h = size.height

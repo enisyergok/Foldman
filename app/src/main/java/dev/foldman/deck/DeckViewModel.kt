@@ -64,6 +64,12 @@ data class DeckUi(
     val currentQueueId: Long = -1,
     val keySounds: Boolean = true,
     val haptics: Boolean = true,
+    /** 0 NORMAL, 1 CrO2, 2 METAL: the tone the tape type gives local playback. */
+    val tapeType: Int = 0,
+    /** The NR switch: rolls off the hiss band on local playback. */
+    val noiseReduction: Boolean = false,
+    /** The MONITOR switch: keeps the screen lit while the tape runs. */
+    val monitor: Boolean = true,
     val apple: AppleUi = AppleUi(),
 ) {
     /** How far through the tape we are: the left reel empties into the right one as this grows. */
@@ -356,6 +362,29 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         tick()
     }
 
+    fun setTapeType(type: Int) {
+        prefs.edit { putInt(KEY_TAPE_TYPE, type.coerceIn(0, 2)) }
+        tick()
+    }
+
+    fun setNoiseReduction(on: Boolean) {
+        prefs.edit { putBoolean(KEY_NOISE_REDUCTION, on) }
+        tick()
+    }
+
+    fun setMonitor(on: Boolean) {
+        prefs.edit { putBoolean(KEY_MONITOR, on) }
+        tick()
+    }
+
+    /** Moves the tape to [fraction] of the current song (the position bar). */
+    fun seekToFraction(fraction: Float) {
+        val duration = _ui.value.durationMs
+        if (winding != 0 || duration <= 0) return
+        backend.seekTo((duration * fraction.coerceIn(0f, 1f)).toLong())
+        tick()
+    }
+
     // region Apple Music
 
     private val developerToken: String?
@@ -535,6 +564,9 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
             currentQueueId = if (source == Source.LOCAL) state.trackIndex.toLong() else state.currentQueueId,
             keySounds = prefs.getBoolean(KEY_SOUNDS, true),
             haptics = prefs.getBoolean(KEY_HAPTICS, true),
+            tapeType = prefs.getInt(KEY_TAPE_TYPE, 0),
+            noiseReduction = prefs.getBoolean(KEY_NOISE_REDUCTION, false),
+            monitor = prefs.getBoolean(KEY_MONITOR, true),
             apple = apple.value,
         )
     }
@@ -580,6 +612,9 @@ class DeckViewModel(app: Application) : AndroidViewModel(app) {
         private const val KEY_FOLDER = "folder"
         private const val KEY_SOUNDS = "key_sounds"
         private const val KEY_HAPTICS = "haptics"
+        const val KEY_TAPE_TYPE = "tape_type"
+        const val KEY_NOISE_REDUCTION = "noise_reduction"
+        private const val KEY_MONITOR = "monitor"
         private const val KEY_APPLE_DEV = "apple_developer_token"
         private const val KEY_APPLE_USER = "apple_music_user_token"
         /** Winding speed relative to play: a four-minute song winds through in about 20 s. */
