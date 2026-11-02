@@ -329,20 +329,20 @@ fun CassetteRack(
 @Composable
 private fun RackHeader(count: Int, onSources: () -> Unit, onFolder: () -> Unit) {
     Row(Modifier.height(36.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("CASSETTE RACK", style = EngravedCaps.copy(color = RackInk, fontSize = 15.sp, letterSpacing = 3.sp))
-        Spacer(Modifier.width(12.dp))
+        Text("CASSETTE RACK", style = EngravedCaps.copy(color = RackInk, fontSize = 14.sp, letterSpacing = 2.2.sp), maxLines = 1, softWrap = false)
+        Spacer(Modifier.width(9.dp))
         Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(9.dp))
         Text(
             if (count == 1) "1 TAPE" else "$count TAPES",
-            style = EngravedCaps.copy(color = RackOrange, fontSize = 12.sp, letterSpacing = 1.5.sp),
+            style = EngravedCaps.copy(color = RackOrange, fontSize = 11.sp, letterSpacing = 1.2.sp),
             maxLines = 1, softWrap = false,
         )
         Spacer(Modifier.weight(1f))
         Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
-        Text("FOLDER", style = EngravedCaps.copy(color = RackInk, fontSize = 11.sp, letterSpacing = 2.sp), modifier = Modifier.clickable(onClick = onFolder).padding(horizontal = 14.dp, vertical = 8.dp))
+        Text("FOLDER", style = EngravedCaps.copy(color = RackInk, fontSize = 10.sp, letterSpacing = 1.2.sp), maxLines = 1, softWrap = false, modifier = Modifier.clickable(onClick = onFolder).padding(horizontal = 9.dp, vertical = 8.dp))
         Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
-        Text("SOURCES", style = EngravedCaps.copy(color = RackInk, fontSize = 11.sp, letterSpacing = 2.sp), modifier = Modifier.clickable(onClick = onSources).padding(start = 14.dp, top = 8.dp, bottom = 8.dp))
+        Text("SOURCES", style = EngravedCaps.copy(color = RackInk, fontSize = 10.sp, letterSpacing = 1.2.sp), maxLines = 1, softWrap = false, modifier = Modifier.clickable(onClick = onSources).padding(start = 9.dp, top = 8.dp, bottom = 8.dp))
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(RackLine))
 }
