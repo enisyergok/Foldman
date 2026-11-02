@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,7 +55,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -107,7 +111,9 @@ class RackActions(
 private val RackInk = Color(0xFFF2EBDC)
 private val RackDim = Color(0xFFB9B2A8)
 private val RackOrange = Color(0xFFF0722B)
-private val RackPanel = Brush.verticalGradient(listOf(Color(0xFF2A1F17), Color(0xFF1C1510)))
+private val RackPanel = Brush.verticalGradient(listOf(Color(0xFF3C3733), Color(0xFF2A2522), Color(0xFF1D1917)))
+private val RackRim = Brush.verticalGradient(listOf(Color(0xFFD9A06A), Color(0x88A8693A), Color(0xFF8A5A33)))
+private val RackLine = Color(0x2EFFFFFF)
 private val Hand = TextStyle(fontFamily = FontFamily.Cursive, color = DeckColors.Ink, fontSize = 20.sp)
 private val Typed = TextStyle(fontFamily = FontFamily.Monospace, color = DeckColors.Ink, fontSize = 12.sp)
 
@@ -180,15 +186,22 @@ fun CassetteRack(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .fillMaxHeight(0.76f)
+                .padding(horizontal = 4.dp)
+                .padding(bottom = 6.dp)
                 .graphicsLayer {
                     translationY = size.height * 0.62f * lift
                     alpha = 1f - 0.85f * lift
                 }
-                .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .clip(RoundedCornerShape(26.dp))
                 .background(RackPanel)
+                .drawBehind {
+                    // the brushed sheen across the metal
+                    drawRect(Brush.linearGradient(listOf(Color(0x22FFFFFF), Color.Transparent, Color(0x14FFFFFF)), Offset(0f, 0f), Offset(size.width, size.height * 0.5f)))
+                }
+                .border(BorderStroke(1.3.dp, RackRim), RoundedCornerShape(26.dp))
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(horizontal = 14.dp)
-                .padding(top = 14.dp),
+                .padding(horizontal = 18.dp)
+                .padding(top = 18.dp),
         ) {
             if (onShelf) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -222,11 +235,20 @@ fun CassetteRack(
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = query, onValueChange = { query = it }, singleLine = true,
-                            placeholder = { Text("Search the rack", fontSize = 13.sp) },
+                            shape = RoundedCornerShape(14.dp),
+                            textStyle = TextStyle(color = RackInk, fontSize = 15.sp),
+                            leadingIcon = { Magnifier() },
+                            placeholder = { Text("Search the rack", fontSize = 15.sp, fontStyle = FontStyle.Italic) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = RackInk, unfocusedTextColor = RackInk, cursorColor = RackOrange,
+                                focusedBorderColor = RackOrange, unfocusedBorderColor = Color(0x55FFFFFF),
+                                focusedContainerColor = Color(0x33000000), unfocusedContainerColor = Color(0x33000000),
+                                focusedPlaceholderColor = RackDim, unfocusedPlaceholderColor = RackDim,
+                            ),
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Spacer(Modifier.height(8.dp))
-                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), userScrollEnabled = !carrying, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Spacer(Modifier.height(12.dp))
+                        LazyColumn(Modifier.weight(1f).fillMaxWidth(), userScrollEnabled = !carrying, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             items(shown, key = { it.id }) { tape ->
                                 TapeCard(
                                     tape = tape, inDeck = tape.id == ui.tape.id,
@@ -254,11 +276,16 @@ fun CassetteRack(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            "DRAG A TAPE'S COVER OR HANDLE INTO THE DECK · HOLD TO READ ITS CARD",
-                            style = EngravedCaps.copy(color = RackDim, fontSize = 8.sp, letterSpacing = 1.5.sp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-                        )
+                        Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.width(14.dp).height(1.dp).background(RackLine))
+                            Text(
+                                "DRAG A TAPE'S COVER OR HANDLE INTO THE DECK · HOLD TO READ ITS CARD",
+                                style = EngravedCaps.copy(color = RackDim, fontSize = 7.sp, letterSpacing = 0.9.sp),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
+                            )
+                            Box(Modifier.width(14.dp).height(1.dp).background(RackLine))
+                        }
                     }
                 }
             }
@@ -301,28 +328,105 @@ fun CassetteRack(
 
 @Composable
 private fun RackHeader(count: Int, onSources: () -> Unit, onFolder: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("CASSETTE RACK", style = EngravedCaps.copy(color = RackDim, fontSize = 11.sp, letterSpacing = 3.sp))
-        Spacer(Modifier.width(10.dp))
-        Text(if (count == 1) "1 TAPE" else "$count TAPES", style = EngravedCaps.copy(color = RackOrange, fontSize = 9.sp, letterSpacing = 2.sp), modifier = Modifier.weight(1f))
-        Text("FOLDER", style = EngravedCaps.copy(color = RackDim, fontSize = 9.sp), modifier = Modifier.clickable(onClick = onFolder).padding(8.dp))
-        Text("SOURCES", style = EngravedCaps.copy(color = RackDim, fontSize = 9.sp), modifier = Modifier.clickable(onClick = onSources).padding(8.dp))
+    Row(Modifier.height(36.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("CASSETTE RACK", style = EngravedCaps.copy(color = RackInk, fontSize = 15.sp, letterSpacing = 3.sp))
+        Spacer(Modifier.width(12.dp))
+        Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
+        Spacer(Modifier.width(12.dp))
+        Text(if (count == 1) "1 TAPE" else "$count TAPES", style = EngravedCaps.copy(color = RackOrange, fontSize = 12.sp, letterSpacing = 2.sp), modifier = Modifier.weight(1f))
+        Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
+        Text("FOLDER", style = EngravedCaps.copy(color = RackInk, fontSize = 11.sp, letterSpacing = 2.sp), modifier = Modifier.clickable(onClick = onFolder).padding(horizontal = 14.dp, vertical = 8.dp))
+        Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
+        Text("SOURCES", style = EngravedCaps.copy(color = RackInk, fontSize = 11.sp, letterSpacing = 2.sp), modifier = Modifier.clickable(onClick = onSources).padding(start = 14.dp, top = 8.dp, bottom = 8.dp))
     }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(RackLine))
 }
 
 @Composable
 private fun Tabs(selected: Int, labels: List<String>, onSelect: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth()) {
+    Row(Modifier.fillMaxWidth().height(46.dp), verticalAlignment = Alignment.CenterVertically) {
         labels.forEachIndexed { i, label ->
-            Column(
-                Modifier.weight(1f).clickable { onSelect(i) }.padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            if (i > 0) Box(Modifier.width(1.dp).height(24.dp).background(RackLine))
+            Box(
+                Modifier.weight(1f).fillMaxHeight().clickable { onSelect(i) }
+                    .drawBehind {
+                        if (i == selected) {
+                            val w = size.width * 0.62f
+                            val x = (size.width - w) / 2f
+                            drawRect(RackOrange.copy(alpha = 0.25f), Offset(x, size.height - 5.dp.toPx()), Size(w, 5.dp.toPx()))
+                            drawRect(RackOrange, Offset(x, size.height - 2.dp.toPx()), Size(w, 2.dp.toPx()))
+                        }
+                    },
+                contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = EngravedCaps.copy(color = if (i == selected) RackInk else RackDim, fontSize = 10.sp, letterSpacing = 2.sp))
-                Spacer(Modifier.height(4.dp))
-                Box(Modifier.fillMaxWidth().height(2.dp).background(if (i == selected) RackOrange else Color.Transparent))
+                Text(label, style = EngravedCaps.copy(color = if (i == selected) Color.White else RackDim, fontSize = 13.sp, letterSpacing = 2.sp))
             }
         }
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(RackLine))
+}
+
+/** The magnifier in the search field. */
+@Composable
+private fun Magnifier() {
+    Canvas(Modifier.size(22.dp)) {
+        val c = Color(0xFFD8D2C6)
+        val r = size.minDimension * 0.30f
+        val centre = Offset(size.width * 0.42f, size.height * 0.42f)
+        drawCircle(c, r, centre, style = Stroke(2.dp.toPx()))
+        drawLine(c, centre + Offset(r * 0.72f, r * 0.72f), Offset(size.width * 0.88f, size.height * 0.88f), 2.4.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    }
+}
+
+/** A small Sony-style cassette for a rack card: the label stripe, the reels and the grade (HF, UX, EF) vary per tape. */
+@Composable
+private fun CassetteThumb(tape: Tape<LocalTrack>, modifier: Modifier) {
+    val measurer = rememberTextMeasurer()
+    val grade = remember(tape.id) { Math.floorMod(tape.id.hashCode(), 3) }
+    val name = listOf("HF", "UX", "EF")[grade] + if (tape.durationMs <= 40 * 60_000L) "60" else "90"
+    val accent = listOf(Color(0xFFE8742A), Color(0xFFD9A441), Color(0xFF4F82C6))[grade]
+    val dark = grade == 1
+    val brand = remember { measurer.measure("SONY", TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 6.sp, color = Color(0xFF3A3532))) }
+    val model = remember(name) { measurer.measure(name, TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 8.sp, color = accent)) }
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val corner = CornerRadius(4.dp.toPx())
+        drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFF1EBDD), Color(0xFFD9D1C0))), cornerRadius = corner)
+        drawRoundRect(Color(0xFF6E675C), cornerRadius = corner, style = Stroke(1.dp.toPx()))
+        // the label
+        val label = Rect(w * 0.07f, h * 0.10f, w * 0.93f, h * 0.76f)
+        drawRoundRect(Color(0xFFF8F3E6), label.topLeft, label.size, CornerRadius(2.dp.toPx()))
+        // the colour stripes across the label's lower left
+        val stripe = Path().apply {
+            moveTo(label.left, label.bottom - label.height * 0.34f)
+            lineTo(label.left + label.width * 0.42f, label.top + label.height * 0.04f)
+            lineTo(label.left + label.width * 0.58f, label.top + label.height * 0.04f)
+            lineTo(label.left, label.bottom - label.height * 0.04f)
+            close()
+        }
+        drawPath(stripe, accent.copy(alpha = 0.85f))
+        drawText(brand, topLeft = Offset(label.left + 3.dp.toPx(), label.top + 1.dp.toPx()))
+        // the tape window with the two reels
+        val window = Rect(w * 0.20f, h * 0.30f, w * 0.80f, h * 0.68f)
+        drawRoundRect(Color(0xFF3A3532), window.topLeft, window.size, CornerRadius(h * 0.19f))
+        for (cx in listOf(0.36f, 0.64f)) {
+            val c = Offset(w * cx, window.center.y)
+            drawCircle(Color(0xFFE9E4D8), h * 0.15f, c)
+            drawCircle(Color(0xFF2A2624), h * 0.07f, c)
+            for (k in 0 until 6) {
+                val a = k * (Math.PI / 3.0)
+                drawCircle(Color(0xFFE9E4D8), 0.9.dp.toPx(), c + Offset((Math.cos(a) * h * 0.085f).toFloat(), (Math.sin(a) * h * 0.085f).toFloat()))
+            }
+        }
+        drawText(model, topLeft = Offset(label.right - model.size.width - 3.dp.toPx(), label.bottom - model.size.height - 0.5.dp.toPx()))
+        // the shell's bottom
+        val base = Path().apply {
+            moveTo(w * 0.16f, h * 0.78f); lineTo(w * 0.84f, h * 0.78f); lineTo(w * 0.90f, h * 0.97f); lineTo(w * 0.10f, h * 0.97f); close()
+        }
+        drawPath(base, if (dark) Color(0xFF2B2826) else Color(0xFFB9B2A4))
+        drawCircle(if (dark) Color(0xFF6B655C) else Color(0xFF8D867A), 1.2.dp.toPx(), Offset(w * 0.30f, h * 0.88f))
+        drawCircle(if (dark) Color(0xFF6B655C) else Color(0xFF8D867A), 1.2.dp.toPx(), Offset(w * 0.70f, h * 0.88f))
     }
 }
 
@@ -359,12 +463,12 @@ private fun BlankMixtape(onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .height(68.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(76.dp)
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .drawBehind {
                 drawRoundRect(
-                    RackDim.copy(alpha = 0.6f), cornerRadius = CornerRadius(12.dp.toPx()),
+                    RackDim.copy(alpha = 0.6f), cornerRadius = CornerRadius(18.dp.toPx()),
                     style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f))),
                 )
             }
@@ -402,7 +506,7 @@ private fun TapeCard(
     val dragStart by rememberUpdatedState(onDragStart)
     val dragMove by rememberUpdatedState(onDrag)
     val dragEnd by rememberUpdatedState(onDragEnd)
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(18.dp)
     val meta = when (tape.kind) {
         TapeKind.ALBUM, TapeKind.MIXTAPE -> Tapes.lengthText(tape.durationMs)
         else -> Tapes.lengthText(tape.durationMs)
@@ -410,11 +514,14 @@ private fun TapeCard(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .height(76.dp)
             .onGloballyPositioned { layout = it }
             .clip(shape)
-            .background(Brush.horizontalGradient(listOf(Color(0xFF3A2E25), Color(0xFF2B221B))))
-            .border(if (inDeck) BorderStroke(1.5.dp, RackOrange) else BorderStroke(1.dp, Color(0x22FFFFFF)), shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF47413D), Color(0xFF2E2927), Color(0xFF252120))))
+            .drawBehind {
+                if (inDeck) drawRoundRect(RackOrange.copy(alpha = 0.22f), cornerRadius = CornerRadius(18.dp.toPx()), style = Stroke(7.dp.toPx()))
+            }
+            .border(if (inDeck) BorderStroke(2.dp, RackOrange) else BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x44FFFFFF), Color(0x14FFFFFF)))), shape)
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = "${tape.title}. ${tape.subtitle}" + if (inDeck) ". In the deck" else ""
@@ -422,7 +529,7 @@ private fun TapeCard(
                 customActions = listOf(CustomAccessibilityAction("Read its card") { hold(); true })
             }
             .pointerInput(Unit) {
-                val gripLeft = 74.dp.toPx()
+                val gripLeft = 96.dp.toPx()
                 val gripRight = 42.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -483,21 +590,29 @@ private fun TapeCard(
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(5.dp).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(tape.kindColor))
-        Spacer(Modifier.width(8.dp))
-        CoverThumb(tape.songs.firstOrNull()?.coverUri, Modifier.size(52.dp))
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(4.dp))
+        CassetteThumb(tape, Modifier.width(76.dp).height(48.dp))
+        Spacer(Modifier.width(12.dp))
+        Box(Modifier.width(1.dp).height(42.dp).background(RackLine))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(tape.title, color = RackInk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(tape.subtitle, color = RackDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tape.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tape.subtitle, color = RackDim, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(meta, color = RackDim, fontSize = 12.sp)
-            if (inDeck) Text("IN DECK", style = EngravedCaps.copy(color = RackOrange, fontSize = 8.sp))
+        Box(Modifier.width(1.dp).height(42.dp).background(RackLine))
+        Column(Modifier.padding(start = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(meta, color = RackInk, fontSize = 15.sp)
+            if (inDeck) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "IN DECK", style = EngravedCaps.copy(color = RackOrange, fontSize = 10.sp),
+                    modifier = Modifier.border(BorderStroke(1.dp, RackOrange), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
         // the handle: grab it to carry the tape in any direction
-        Text("⋮⋮", color = RackDim, fontSize = 18.sp, modifier = Modifier.padding(start = 6.dp, end = 2.dp))
+        Text("⋮", color = RackInk, fontSize = 24.sp, modifier = Modifier.padding(start = 6.dp, end = 4.dp))
     }
 }
 
