@@ -1,0 +1,13 @@
+
+dev.foldman.AudioPipelineTest:....
+dev.foldman.PlayerScreenTest:s_glBindAttribLocation: bind attrib 0 name position
+s_glBindAttribLocation: bind attrib 1 name color
+s_glBindAttribLocation: bind attrib 2 name localCoord
+.
+dev.foldman.RackScreenTest:.
+
+Time: 83.817
+
+OK (6 tests)
+
+
