@@ -264,11 +264,17 @@ fun VuMeter(transport: Transport, source: Source, modifier: Modifier = Modifier,
     }
 }
 
+/**
+ * 0 VU sits at −14 dBFS RMS, about where a mastered track's average level lives, so music fills the lamps
+ * (the old −10 dBFS reference left ordinary tracks around the first five lamps).
+ */
+private const val VU_REFERENCE = 5f
+
 /** RMS level to needle position (0..1): −20 VU at the left stop, +3 VU at the right. */
 private fun deflection(rms: Float): Float {
     if (rms <= 0.0005f) return 0f
-    val vu = 20f * log10(rms * 3.2f)
+    val vu = 20f * log10(rms * VU_REFERENCE)
     return ((vu + 20f) / 23f).coerceIn(0f, 1.08f)
 }
 
-private fun dbToRms(db: Float): Float = Math.pow(10.0, db / 20.0).toFloat() / 3.2f
+private fun dbToRms(db: Float): Float = Math.pow(10.0, db / 20.0).toFloat() / VU_REFERENCE
