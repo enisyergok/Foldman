@@ -333,7 +333,12 @@ private fun RackHeader(count: Int, onSources: () -> Unit, onFolder: () -> Unit) 
         Spacer(Modifier.width(12.dp))
         Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
         Spacer(Modifier.width(12.dp))
-        Text(if (count == 1) "1 TAPE" else "$count TAPES", style = EngravedCaps.copy(color = RackOrange, fontSize = 12.sp, letterSpacing = 2.sp), modifier = Modifier.weight(1f))
+        Text(
+            if (count == 1) "1 TAPE" else "$count TAPES",
+            style = EngravedCaps.copy(color = RackOrange, fontSize = 12.sp, letterSpacing = 1.5.sp),
+            maxLines = 1, softWrap = false,
+        )
+        Spacer(Modifier.weight(1f))
         Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
         Text("FOLDER", style = EngravedCaps.copy(color = RackInk, fontSize = 11.sp, letterSpacing = 2.sp), modifier = Modifier.clickable(onClick = onFolder).padding(horizontal = 14.dp, vertical = 8.dp))
         Box(Modifier.width(1.dp).height(20.dp).background(RackLine))
@@ -387,7 +392,7 @@ private fun CassetteThumb(tape: Tape<LocalTrack>, modifier: Modifier) {
     val accent = listOf(Color(0xFFE8742A), Color(0xFFD9A441), Color(0xFF4F82C6))[grade]
     val dark = grade == 1
     val brand = remember { measurer.measure("SONY", TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 6.sp, color = Color(0xFF3A3532))) }
-    val model = remember(name) { measurer.measure(name, TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 8.sp, color = accent)) }
+    val model = remember(name) { measurer.measure(name, TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 7.sp, color = accent)) }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -408,15 +413,15 @@ private fun CassetteThumb(tape: Tape<LocalTrack>, modifier: Modifier) {
         drawPath(stripe, accent.copy(alpha = 0.85f))
         drawText(brand, topLeft = Offset(label.left + 3.dp.toPx(), label.top + 1.dp.toPx()))
         // the tape window with the two reels
-        val window = Rect(w * 0.20f, h * 0.30f, w * 0.80f, h * 0.68f)
-        drawRoundRect(Color(0xFF3A3532), window.topLeft, window.size, CornerRadius(h * 0.19f))
+        val window = Rect(w * 0.20f, h * 0.24f, w * 0.80f, h * 0.54f)
+        drawRoundRect(Color(0xFF3A3532), window.topLeft, window.size, CornerRadius(h * 0.15f))
         for (cx in listOf(0.36f, 0.64f)) {
             val c = Offset(w * cx, window.center.y)
-            drawCircle(Color(0xFFE9E4D8), h * 0.15f, c)
-            drawCircle(Color(0xFF2A2624), h * 0.07f, c)
+            drawCircle(Color(0xFFE9E4D8), h * 0.125f, c)
+            drawCircle(Color(0xFF2A2624), h * 0.06f, c)
             for (k in 0 until 6) {
                 val a = k * (Math.PI / 3.0)
-                drawCircle(Color(0xFFE9E4D8), 0.9.dp.toPx(), c + Offset((Math.cos(a) * h * 0.085f).toFloat(), (Math.sin(a) * h * 0.085f).toFloat()))
+                drawCircle(Color(0xFFE9E4D8), 0.9.dp.toPx(), c + Offset((Math.cos(a) * h * 0.075f).toFloat(), (Math.sin(a) * h * 0.075f).toFloat()))
             }
         }
         drawText(model, topLeft = Offset(label.right - model.size.width - 3.dp.toPx(), label.bottom - model.size.height - 0.5.dp.toPx()))
